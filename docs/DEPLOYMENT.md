@@ -1,76 +1,62 @@
-# Облачный запуск
+# Google-подключения · v0.3
 
-Для этой команды создан проект **campuspulse-ai-511817**. На 16 октября 2026 биллинг не подключён; владелец решил вернуться к облаку позже. Ниже — подготовленная процедура, а не отчёт об успешном развёртывании.
+Облако отложено владельцем. Этот файл — инструкция; наличие кода/конфигурации не подтверждает развёртывание. Здесь не предлагается вводить API-ключ в браузер студента.
 
-## 1. Действия владельца аккаунта
+## 1. Gemini без API-ключа
 
-В [Google Cloud Billing](https://console.cloud.google.com/billing/linkedaccount?project=campuspulse-ai-511817) подключить биллинг к нужному проекту. Платёжные данные, принятие условий Google и лимит бюджета выполняет владелец. Наличие стартовых кредитов зависит от аккаунта; бесплатность работы не гарантируется.
-
-Расходы могут включать Gemini, Agent Engine, Cloud Run, Firestore, Cloud Build, Artifact Registry, Cloud Storage и логи. Перед запуском проверить [текущие цены Google Cloud](https://cloud.google.com/pricing) и установить уведомления о бюджете. Уведомление о бюджете **не является жёстким ограничением расходов**. После демонстрации удалить ненужные ресурсы вручную; не удалять сам проект с данными команды без решения владельца.
-
-## 2. Локальный доступ и проверка модели
-
-Установить [Google Cloud CLI](https://cloud.google.com/sdk/docs/install) из официального источника. В корне репозитория:
+Владелец настраивает Google Cloud project, биллинг, Vertex AI API и IAM. Локальная авторизация для разработки:
 
 ```bash
-gcloud auth login
 gcloud auth application-default login
-gcloud auth application-default set-quota-project campuspulse-ai-511817
-source .venv/bin/activate
+gcloud auth application-default set-quota-project YOUR_PROJECT_ID
 ```
 
-Указать `GOOGLE_CLOUD_PROJECT=campuspulse-ai-511817`, `AGENT_MODE=gemini`, `GEMINI_LOCATION=global` и `GEMINI_MODEL=gemini-3.6-flash` в `.env`. Убедиться, что выбран нужный аккаунт, биллинг активен, а аккаунт имеет права создавать сервисы и назначать необходимые роли.
+В `.env` задайте `GOOGLE_CLOUD_PROJECT` и `AGENT_MODE=gemini`. Используется Google Gen AI SDK `Client(vertexai=True, project=..., location=...)` с ADC. На Cloud Run/Agent Engine используются служебные аккаунты, без файловых ключей. `python -m scripts.preflight --live` выполняет небольшой **потенциально платный** запрос; запускать после подключения облака.
 
-## 3. Инфраструктура
+При `AGENT_MODE=auto` приложение выбирает `remote`, если задан Engine resource, иначе `gemini` при наличии project+ADC; без них — явный режим `tools`. Обнаруженные credentials не доказывают доступ к модели, его подтверждает только успешный запрос. Ошибка Gemini не скрывается переходом на другой ИИ.
+
+## 2. Google Calendar: один раз для владельца
+
+Calendar OAuth настраивается отдельно от Vertex AI. Уже выполненный вход в Google в Safari не является OAuth-разрешением для CampusPulse.
+
+1. В своём Google Cloud project включите **Google Calendar API**. Создайте OAuth consent configuration. В режиме тестирования добавьте тестовые Google-аккаунты команды.
+2. Создайте **OAuth client → Web application**. Для локального запуска добавьте точный redirect URI `http://127.0.0.1:8765/api/google/callback`. Для Cloud Run используйте HTTPS-адрес приложения с тем же путём.
+3. В локальном `.env` заполните `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `APP_BASE_URL`. Файл игнорируется Git. Не отправляйте значения в чат и не помещайте их в репозиторий.
+4. Перезапустите приложение, откройте «Моя неделя → Подключить Google Calendar» и самостоятельно разрешите доступ к событиям основного собственного календаря. Приложение запрашивает `calendar.events.owned`. Для широкого внешнего использования Google может потребовать проверку OAuth-приложения; режим тестирования имеет ограничения.
+5. Подготовьте событие в чате. До получения полного дня/времени будет уточнение. При успехе должна появиться настоящая ссылка Google Calendar. Проверьте её в своём аккаунте. Проверка записи не выполнялась в этой итерации.
+
+Поток включает state, PKCE, одноразовый callback, обновление и отзыв токенов. Access/refresh tokens шифруются, не отдаются в workspace, не передаются Gemini/MCP и не выводятся в trace. Локальная `.calendar-token-key` создаётся в игнорируемой data/ с правами 0600. Не переносите одну базу без соответствующего ключа; при потере ключа подключите Google заново.
+
+## 3. Agent Engine и Cloud Run
+
+После разрешения владельца подключить облако:
 
 ```bash
-bash scripts/setup_gcp.sh campuspulse-ai-511817
-python -m scripts.preflight --live
-```
-
-Скрипт включает API, создаёт staging bucket, Firestore Native и сервисный аккаунт `campuspulse-web`. Выдаёт ему `roles/aiplatform.user` и `roles/datastore.user`, а сервисной идентичности Agent Engine — доступ к Vertex AI. Он не создаёт долгоживущие ключи service account. При ограничениях организации назначения ролей должен выполнить администратор. Сборка Cloud Run также требует стандартных разрешений Cloud Build; скрипт не расширяет их автоматически при ошибке.
-
-## 4. Agent Engine
-
-```bash
-python -m scripts.deploy_agent \
-  --project campuspulse-ai-511817 \
-  --bucket gs://campuspulse-ai-511817-agent-staging
+bash scripts/setup_gcp.sh YOUR_PROJECT_ID
+python -m scripts.deploy_agent --project YOUR_PROJECT_ID --bucket gs://YOUR_PROJECT_ID-agent-staging
 python -m scripts.verify_cloud
+bash scripts/deploy_web.sh YOUR_PROJECT_ID ENGINE_RESOURCE_NAME
 ```
 
-`deploy_agent.py` вызывает `vertexai.preview.reasoning_engines.ReasoningEngine.create` с Python 3.11, зафиксированными зависимостями и пакетом `campuspulse`. Файл `deployment.json` сохраняет resource name и сначала содержит `api_verified=false`.
+Используется именно `vertexai.preview.reasoning_engines.ReasoningEngine.create/update`, как в ТЗ. `verify_cloud` требует реальный удалённый ответ с успешными MCP current_time и study_progress, а не только создание ресурса. Результат пишется в локальный `evidence/live-cloud.json`; проверьте личные данные перед публикацией.
 
-`verify_cloud.py` делает настоящий OAuth API-запрос и требует успешных `current_time` и `github_issues` в трассе. Только успешная проверка устанавливает `api_verified=true`. Доказательство сохраняется в игнорируемый Git файлом `evidence/live-cloud.json`. Перед публикацией любых трасс проверить отсутствие личного текста.
+Cloud Run по умолчанию приватный. Для OAuth-входа нужен доступный пользователю HTTPS URL, разрешённый IAM-доступ к сервису и соответствующий redirect URI. Публичный доступ автоматически не включается.
 
-При обновлении передать `--update projects/.../locations/.../reasoningEngines/...`, чтобы не создавать второй оплачиваемый ресурс. Если API изменился, свериться с [официальным SDK reference](https://docs.cloud.google.com/python/docs/reference/vertexai/latest/vertexai.preview.reasoning_engines.ReasoningEngine).
+Для Calendar на Cloud Run:
 
-## 5. Интерфейс в Cloud Run
+- `APP_BASE_URL` — фактический HTTPS URL; `COOKIE_SECURE=true`.
+- OAuth client secret и **один стабильный Fernet key** хранятся в Google Secret Manager и подаются как `GOOGLE_OAUTH_CLIENT_SECRET` и `GOOGLE_TOKEN_ENCRYPTION_KEY`.
+- `GOOGLE_OAUTH_CLIENT_ID` задаётся серверу. Дайте web service account доступ только к нужным секретам.
+- `STORAGE_BACKEND=firestore`; один encryption key на все инстансы/ревизии. Без него Calendar OAuth для Firestore отклоняется до входа.
+- Локальные launcher/Dockerfile отключают access-log Uvicorn. На прокси/Cloud Logging исключите URL callback с параметрами `code/state` из сохраняемых request logs. Токены никогда не должны попадать в журналы.
+- Контекст Calendar создаётся web-сервисом и передаёт Agent Engine только события/время получения, без OAuth credentials. Запись событий выполняет web-сервис по прямой команде, не модель.
 
-Скопировать `resource_name` из `deployment.json`:
+Firestore и Cloud Run ещё не проверены live. Перед финальной сдачей проверить OAuth callback на выбранном домене, сохранность сессии, refresh после истечения access token, отдельные браузеры, event retry и источник занятых интервалов.
 
-```bash
-bash scripts/deploy_web.sh campuspulse-ai-511817 \
-  projects/PROJECT_NUMBER/locations/us-central1/reasoningEngines/ENGINE_ID
-```
+## Официальные источники
 
-Заменить пример полным реальным именем. Frontend использует Firestore, ADC и Agent Engine. `.env`, SQLite и локальные материалы не входят в контейнер. Cloud Run создаётся **приватным**, с масштабированием 0–2 инстанса и до 4 запросов одновременно на инстанс.
-
-Для показа с машины владельца:
-
-```bash
-gcloud run services proxy campuspulse-web \
-  --project campuspulse-ai-511817 --region us-central1 --port 8080
-```
-
-Открыть `http://localhost:8080`. Если браузер не сохраняет Secure cookie через локальный прокси, использовать прямой HTTPS-доступ через настроенную IAM/IAP-авторизацию; не отключать защиту публичного сервиса ради демонстрации. Публичный доступ через `allUsers` не включается автоматически. Для независимого доступа судей нужно выдать им роль Cloud Run Invoker либо отдельно добавить полноценный вход в приложение.
-
-## Критерии успешного запуска
-
-- Модель реально ответила, в журнале нет статуса имитации.
-- В Google Cloud есть ресурс Agent Engine; удалённый `:query` вернул ответ с MCP-трассой.
-- Cloud Run открывается авторизованному пользователю; изменения сохраняются в Firestore после перезапуска.
-- Две браузерные сессии не видят задания друг друга.
-- Контрольный документ даёт ответ со страницей; при ошибке внешнего API агент сообщает об ошибке.
-
-До выполнения этих проверок отметки «развёрнуто» и «полностью выполнено ТЗ» не ставить.
+- [Google Gen AI SDK](https://github.com/googleapis/python-genai)
+- [OAuth для web applications](https://developers.google.com/identity/protocols/oauth2/web-server)
+- [Google Calendar events.insert](https://developers.google.com/calendar/api/v3/reference/events/insert)
+- [Google Calendar events.list](https://developers.google.com/calendar/api/v3/reference/events/list)
+- [Gemini OAuth](https://ai.google.dev/gemini-api/docs/oauth)

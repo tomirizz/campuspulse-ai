@@ -25,6 +25,39 @@ def facts_from_trace(trace):
             facts.append({"id": f"S{step['step']}-{len(facts) + 1}", "tool": name, "title": title, "text": str(text), "why": why})
         if "error" in r:
             add("Источник недоступен", r["error"], proof("Ошибка инструмента", "данные не получены", step["arguments"], r["error"], name))
+        elif name == "search_materials":
+            add("Поиск по материалам", f"Найдено фрагментов: {r['total_matches']}; показано: {len(r['matches'])}.", r["why"])
+            for m in r["matches"]:
+                add(f"{m['file']} · стр. {m['page']} · строка {m['line']}", m["quote"], m["why"])
+            for difference in r["possible_differences"]:
+                add("Нужна сверка контекста", difference["note"], proof("Числа различаются", "в двух похожих фрагментах различаются последовательности чисел", {"A": difference["a"], "B": difference["b"]}, "Возможное расхождение", "Результат поиска по вашим материалам"))
+        elif name == "read_syllabus":
+            add("Задания из силлабуса", f"Предложений: {len(r['candidates'])}. Проверьте и сохраните их в разделе «Материалы → Разобрать силлабус».", r["why"])
+            for c in r["candidates"]:
+                add(c["title"], f"Дата: {c['date'] or 'не указана'}. Время: {c['time'] or 'не указано'}. Нужно уточнить: {', '.join(c['missing'])}.", c["why"])
+            for source in r["grading_rules"]:
+                add("Правило оценивания из силлабуса", source["quote"], source["why"])
+        elif name == "compare_plan":
+            add("Сравнение планов", f"Было: {r['before']['scheduled_minutes']} мин. Стало: {r['after']['scheduled_minutes']} мин. Изменение: {r['delta_minutes']} мин. Сохранённые настройки не изменены.", r["why"])
+            for risk in r["after"]["risks"]:
+                add(risk["title"], f"{risk['reason']}. Не распределено: {risk['unscheduled_minutes']} мин.", risk["why"])
+        elif name == "grade_target":
+            text = f"Для цели {r['target']} нужен балл {r['required_score']} из {r['max_score']} за «{r['component']}»."
+            if not r["achievable"]:
+                text += f" Цель недостижима при этих данных: максимально {r['maximum_final']}."
+            if r["already_reached"]:
+                text += " Цель уже достигнута по взвешенной сумме; дополнительные условия курса проверяются отдельно."
+            add("Нужная оценка", text, r["why"])
+        elif name == "learning_quests":
+            add("Учебные квесты", f"Подготовлено вопросов: {len(r['questions'])}. Откройте «Практика», проверьте эталоны и начните тренировку.", r["why"])
+        elif name == "diagnose_code":
+            add("Проверка кода", "Синтаксических ошибок не найдено. Исполнение и тесты не запускались." if r["syntax_ok"] else "Синтаксический анализатор нашёл ошибку.", r["why"])
+            for issue in r["issues"]:
+                add(f"{r['filename']} · строка {issue['line']} · столбец {issue['column']}", issue["message"] + "\n" + issue["quote"] + "\n" + issue.get("hint", ""), issue["why"])
+        elif name == "calendar_events":
+            add("Снимок Google Calendar", f"Событий: {len(r['events'])}. Получено: {r['fetched_at']}.", r["why"])
+            for event in r["events"][:12]:
+                add(event["title"], f"{event['start']} → {event['end']}", proof("Событие Google", "поля start/end ответа events.list", {"получено": r["fetched_at"]}, event, event.get("url") or "Google Calendar API"))
         elif name == "current_time":
             add("Время проверки", r.get("iso", r.get("now", json.dumps(r, ensure_ascii=False))),
                 proof("Текущее время", "системные часы сервера → выбранный часовой пояс", step["arguments"], r, "MCP current_time"))
@@ -57,10 +90,6 @@ def facts_from_trace(trace):
                             proof("Точная цитата", "фрагмент извлечённого текста без перефразирования", {"страница": p["page"], "строка": number, "символы": [start+1, start+len(quote)]}, quote, r["source"], "Нумерация строк относится к извлечённому тексту; оригинальная вёрстка PDF может отличаться."))
                         if len(facts) >= 80:
                             return facts
-        elif name == "github_issues":
-            add("GitHub — свежая выборка", r["coverage"], proof("Покрытие GitHub", "полученная выборка, без экстраполяции", {"получено": r["fetched_at"]}, len(r["issues"]), r["source"]))
-            for issue in r["issues"][:12]:
-                add(f"Issue #{issue['number']}", issue["title"], proof("GitHub issue", "поле title из GitHub API", {"получено": r["fetched_at"], "number": issue["number"]}, issue["title"], issue["url"], "Дедлайн из отсутствующих данных не выводится."))
     return facts
 
 

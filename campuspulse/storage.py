@@ -28,6 +28,10 @@ class SQLiteStore:
         with self.connect() as db:
             db.execute("INSERT OR REPLACE INTO records VALUES (?,?,?,?)", (sid, kind, key, json.dumps(body, ensure_ascii=False)))
 
+    def put_once(self, sid, kind, key, body):
+        with self.connect() as db:
+            return bool(db.execute("INSERT OR IGNORE INTO records VALUES (?,?,?,?)", (sid, kind, key, json.dumps(body, ensure_ascii=False))).rowcount)
+
     def delete(self, sid, kind, key):
         with self.connect() as db:
             return bool(db.execute("DELETE FROM records WHERE sid=? AND kind=? AND id=?", (sid, kind, key)).rowcount)
@@ -64,6 +68,14 @@ class FirestoreStore:
     def put(self, sid, kind, key, body):
         self.collection(sid, kind).document(key).set(body)
 
+    def put_once(self, sid, kind, key, body):
+        from google.api_core.exceptions import AlreadyExists
+        try:
+            self.collection(sid, kind).document(key).create(body)
+            return True
+        except AlreadyExists:
+            return False
+
     def delete(self, sid, kind, key):
         doc = self.collection(sid, kind).document(key)
         existed = doc.get().exists
@@ -84,7 +96,7 @@ class FirestoreStore:
         return change(self.client.transaction())
 
     def clear(self, sid):
-        for kind in ("tasks", "materials", "meta"):
+        for kind in ("tasks", "materials", "meta", "private", "quests", "quest_rewards", "calendar_events"):
             for doc in self.collection(sid, kind).stream():
                 doc.reference.delete()
 

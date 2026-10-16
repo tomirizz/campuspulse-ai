@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
 cd "$(dirname "$0")"
-bash scripts/run.sh --local-ai
+bash scripts/run.sh --open

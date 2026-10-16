@@ -6,7 +6,6 @@ import httpx
 import pytest
 
 from campuspulse.agent import CampusPulseAgent, gemini_run
-from campuspulse.mcp_server import fetch_github_issues
 from campuspulse.tools import ToolHub
 
 
@@ -63,33 +62,8 @@ async def test_loop_is_bounded():
     assert len(models.calls) == 8
 
 
-@pytest.mark.parametrize("code", [404, 403, 429, 500])
-async def test_github_failure_is_explicit(code):
-    async with httpx.AsyncClient(transport=httpx.MockTransport(lambda req: httpx.Response(code))) as client:
-        assert "error" in await fetch_github_issues("owner/repo", client)
-
-
-async def test_github_filters_prs_and_keeps_sources():
-    def handler(request):
-        if request.url.path.endswith("/issues"):
-            return httpx.Response(200, json=[{"number": 1, "title": "Lab", "html_url": "https://github.com/a/b/issues/1", "updated_at": "2026-10-16", "body": "deadline not specified"}, {"pull_request": {}, "number": 2}])
-        return httpx.Response(200, json={"private": False})
-    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-        result = await fetch_github_issues("a/b", client)
-    assert len(result["issues"]) == 1 and result["fetched_at"]
-    assert result["source"] == "https://github.com/a/b/issues"
-
-
 def test_agent_serializes_without_credentials():
     agent = CampusPulseAgent("example-project")
     restored = cloudpickle.loads(cloudpickle.dumps(agent))
     assert restored.project == "example-project"
     assert set(vars(restored)) == {"project", "model", "location"}
-
-
-@pytest.mark.live
-async def test_live_github_through_mcp():
-    async with ToolHub({}) as hub:
-        result = await hub.call("github_issues", {"repository": "googleapis/python-genai"})
-    assert "error" not in result, result
-    assert result["source"] == "https://github.com/googleapis/python-genai/issues"

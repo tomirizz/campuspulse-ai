@@ -28,7 +28,7 @@ function showWhy(p) {
   section("Результат", p.result, typeof p.result === "object");
   section("Источник", p.source);
   section("Как это понимать", p.note);
-  if (/^https:\/\/github\.com\//.test(p.source || "")) {
+  if (safeCalendarUrl(p.source)) {
     const a = el("a", "button secondary", "Открыть источник ↗");
     a.href = p.source;
     a.target = "_blank";

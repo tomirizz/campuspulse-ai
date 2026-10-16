@@ -6,10 +6,12 @@
     <meta name="theme-color" content="#6750db" />
     <title>CampusPulse — маленькие шаги, большой прогресс</title>
     <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/assets/style.css" />
-    <link rel="stylesheet" href="/assets/theme.css" />
-    <script src="/assets/game.js" defer></script>
-    <script src="/assets/app.js" defer></script>
+    <link rel="stylesheet" href="/assets/style.css?v=0.3.0" />
+    <link rel="stylesheet" href="/assets/theme.css?v=0.3.0" />
+    <link rel="stylesheet" href="/assets/features.css?v=0.3.0" />
+    <script src="/assets/game.js?v=0.3.0" defer></script>
+    <script src="/assets/features.js?v=0.3.0" defer></script>
+    <script src="/assets/app.js?v=0.3.0" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#main">К содержимому</a>
@@ -44,6 +46,9 @@
         <button data-view="materials" class="nav-item">
           <span data-icon="book"></span>Материалы
         </button>
+        <button data-view="practice" class="nav-item">
+          <span data-icon="spark"></span>Практика
+        </button>
       </nav>
       <div class="sidebar-bottom">
         <div class="sidebar-note">
@@ -68,7 +73,7 @@
           <strong id="page-name">Мой пульс</strong>
         </div>
         <div class="top-right">
-          <span id="top-date"></span><span class="version">v0.2</span
+          <span id="top-date"></span><span class="version">v0.3</span
           ><button class="top-level" data-view="journey" id="top-level">
             Уровень 1</button
           ><button
@@ -279,7 +284,7 @@
                   id="chat-input"
                   rows="2"
                   maxlength="4000"
-                  placeholder="Например: составь план недели с учётом дедлайнов"
+                  placeholder="Например: запланируй хакатон на 17 октября в 13:00"
                   required
                 ></textarea>
                 <div>
@@ -354,6 +359,52 @@
               ><span data-icon="download"></span>В календарь</a
             >
           </div>
+          <article class="panel calendar-panel">
+            <div class="panel-heading">
+              <div>
+                <div class="eyebrow">GOOGLE CALENDAR</div>
+                <h2>Планы — в одном месте</h2>
+              </div>
+              <span class="tag" id="calendar-status">Проверяю подключение</span>
+            </div>
+            <p class="muted">
+              Напиши событие обычными словами. Если даты или времени не хватает,
+              ассистент уточнит.
+            </p>
+            <form id="event-form" class="inline-form">
+              <label class="sr-only" for="event-message"
+                >Событие для календаря</label
+              ><input
+                id="event-message"
+                placeholder="Запланируй хакатон на 17 октября в 13:00"
+                maxlength="500"
+                required
+              /><button class="button primary" type="submit">
+                Запланировать ↗
+              </button>
+            </form>
+            <div class="calendar-actions">
+              <button
+                class="button secondary"
+                id="calendar-connect"
+                type="button"
+              >
+                Подключить Google Calendar</button
+              ><button class="text-button" id="calendar-sync" type="button">
+                Обновить события</button
+              ><button
+                class="text-button"
+                id="calendar-disconnect"
+                type="button"
+                hidden
+              >
+                Отключить
+              </button>
+            </div>
+            <p id="calendar-message" class="muted" role="status"></p>
+            <div id="calendar-draft"></div>
+            <div id="calendar-events" class="calendar-events"></div>
+          </article>
           <form id="preferences-form" class="preferences panel">
             <label
               >Часовой пояс<select id="pref-zone">
@@ -383,6 +434,14 @@
                 min="1"
                 max="24"
                 required /></label
+            ><label
+              >Событие по умолчанию, мин<input
+                id="pref-event-minutes"
+                type="number"
+                min="5"
+                max="1440"
+                value="60"
+                required /></label
             ><button class="button primary" type="submit">Обновить план</button>
             <details class="busy-details">
               <summary>Занятые часы — пары, работа, встречи</summary>
@@ -396,6 +455,43 @@
               </div>
             </details>
           </form>
+          <details class="panel scenario-panel">
+            <summary>Что, если… изменить доступное время?</summary>
+            <p class="muted">
+              Сравни два плана. Этот просмотр не меняет сохранённое расписание.
+            </p>
+            <form id="scenario-form" class="compact-form">
+              <label
+                >Минут учёбы в день<input
+                  id="scenario-minutes"
+                  type="number"
+                  min="30"
+                  max="480"
+                  step="15"
+                  value="120"
+                  required /></label
+              ><label
+                >Начать через дней<input
+                  id="scenario-delay"
+                  type="number"
+                  min="0"
+                  max="13"
+                  value="0"
+                  required /></label
+              ><label
+                >План на дней<input
+                  id="scenario-days"
+                  type="number"
+                  min="1"
+                  max="14"
+                  value="7"
+                  required /></label
+              ><button class="button secondary" type="submit">
+                Сравнить планы
+              </button>
+            </form>
+            <div id="scenario-result" aria-live="polite"></div>
+          </details>
           <div id="plan-summary"></div>
           <div id="plan-risks"></div>
           <div id="week-grid" class="week-grid"></div>
@@ -422,11 +518,142 @@
               class="sr-only"
           /></label>
           <p class="privacy-note">
-            В локальном режиме материалы обрабатываются на этом компьютере. В
-            режиме Gemini текст передаётся Google для ответа. Загружай только те
-            файлы, которые готов(а) использовать с ИИ.
+            В режиме Gemini выбранные фрагменты передаются Google для ответа. У
+            каждой цитаты есть файл, страница и строка.
           </p>
           <div id="material-list" class="material-list"></div>
+          <article class="panel search-panel">
+            <h2>Найти в материалах</h2>
+            <p class="muted">
+              Один запрос — цитаты из всех загруженных файлов.
+            </p>
+            <form id="material-search-form" class="inline-form">
+              <label class="sr-only" for="material-query"
+                >Что найти в материалах</label
+              ><input
+                id="material-query"
+                placeholder="Например: шаг градиентного спуска"
+                minlength="2"
+                maxlength="500"
+                required
+              /><button class="button primary" type="submit">Найти</button>
+            </form>
+            <div id="search-results" aria-live="polite"></div>
+          </article>
+        </section>
+        <section id="view-practice" class="view" hidden>
+          <div class="section-heading">
+            <div>
+              <div class="eyebrow">ПОНЯТЬ. ПОПРОБОВАТЬ. ПРОВЕРИТЬ.</div>
+              <h1>Практика<span class="green">.</span></h1>
+              <p class="subtitle">
+                Небольшие инструменты с проверяемым результатом.
+              </p>
+            </div>
+          </div>
+          <div
+            class="segmented practice-tabs"
+            aria-label="Инструменты практики"
+          >
+            <button data-practice="quests" class="selected" aria-pressed="true">
+              Учебные квесты</button
+            ><button data-practice="grades" aria-pressed="false">
+              Нужная оценка</button
+            ><button data-practice="code" aria-pressed="false">
+              Проверка кода
+            </button>
+          </div>
+          <article class="panel practice-panel" id="practice-quests">
+            <div class="eyebrow">10 XP ЗА НОВЫЙ ОСВОЕННЫЙ ФАКТ</div>
+            <h2>Повтори своё, запомни важное</h2>
+            <p class="muted">
+              Квесты строятся из строк «термин: определение» в твоих материалах.
+              Сначала проверяем эталоны, затем тренируемся.
+            </p>
+            <form id="quest-source-form" class="inline-form">
+              <label class="sr-only" for="quest-material"
+                >Материал для квеста</label
+              ><select id="quest-material" required>
+                <option value="">Выбери материал</option></select
+              ><button class="button primary" type="submit">
+                Подготовить вопросы
+              </button>
+            </form>
+            <div id="quest-resume"></div>
+            <div id="quest-bank"></div>
+            <div id="quest-session" aria-live="polite"></div>
+          </article>
+          <article class="panel practice-panel" id="practice-grades" hidden>
+            <h2>Сколько нужно набрать?</h2>
+            <p class="muted">
+              Для курса с взвешенной суммой оценок. Введи реальные веса из
+              силлабуса и оставь один компонент неизвестным. Сумма весов — 100%.
+            </p>
+            <form id="grade-form">
+              <div id="grade-rows"></div>
+              <button type="button" class="text-button" id="grade-add">
+                + Ещё компонент
+              </button>
+              <div class="compact-form">
+                <label
+                  >Цель, из 100<input
+                    id="grade-target"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    placeholder="85"
+                    required /></label
+                ><button class="button primary" type="submit">
+                  Рассчитать
+                </button>
+              </div>
+              <label class="check-label"
+                ><input type="checkbox" id="grade-confirm" required />Я
+                проверил(а) веса и дополнительные условия курса</label
+              >
+              <div id="grade-source"></div>
+            </form>
+            <div id="grade-result" aria-live="polite"></div>
+          </article>
+          <article class="panel practice-panel" id="practice-code" hidden>
+            <h2>Пойми ошибку в коде</h2>
+            <p class="muted">
+              Точный результат синтаксического анализатора, строка и причина.
+              Проверяется синтаксис Python или JSON; выполнение программы не
+              запускается.
+            </p>
+            <form id="code-form">
+              <div class="compact-form">
+                <label
+                  >Язык<select id="code-language">
+                    <option value="python">Python</option>
+                    <option value="json">JSON</option>
+                  </select></label
+                ><label
+                  >Имя файла<input
+                    id="code-name"
+                    value="snippet.py"
+                    maxlength="160"
+                    required
+                /></label>
+              </div>
+              <label
+                >Код<textarea
+                  id="code-input"
+                  class="code-editor"
+                  rows="12"
+                  maxlength="60000"
+                  spellcheck="false"
+                  placeholder="Вставь свой код сюда"
+                  required
+                ></textarea></label
+              ><button class="button primary" type="submit">
+                Проверить синтаксис
+              </button>
+            </form>
+            <div id="code-result" aria-live="polite"></div>
+          </article>
         </section>
         <section id="view-journey" class="view" hidden>
           <div class="section-heading">
@@ -478,22 +705,20 @@
           </div>
           <div id="integration-cards" class="integration-grid"></div>
           <article class="panel setting-panel">
-            <h2>Проверка GitHub через MCP</h2>
+            <h2>Google Calendar</h2>
             <p>
-              Получить свежие issues публичного репозитория. Данные
-              запрашиваются у GitHub в момент проверки.
+              Войди в Google и разреши доступ к событиям своего основного
+              календаря. Личный API-ключ не нужен. События добавляются только по
+              твоей явной просьбе.
             </p>
-            <form id="github-form" class="inline-form">
-              <label class="sr-only" for="github-repo"
-                >Публичный репозиторий</label
-              ><input
-                id="github-repo"
-                placeholder="owner/repository"
-                pattern="[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"
-                required
-              /><button class="button primary" type="submit">Проверить</button>
-            </form>
-            <div id="github-result"></div>
+            <button class="button secondary" data-view="week">
+              Открыть календарь →
+            </button>
+            <p class="muted">
+              Настройка подключения выполняется владельцем приложения один раз.
+              Пока Google не подключён, незавершённый запрос сохраняется как
+              черновик.
+            </p>
           </article>
           <article class="panel setting-panel">
             <h2>Твоё пространство</h2>
@@ -534,6 +759,7 @@
             ×
           </button>
         </div>
+        <div id="task-source-preview"></div>
         <input type="hidden" id="task-id" /><label
           >Что нужно сделать<input
             id="task-title"
@@ -599,6 +825,23 @@
         </button>
       </div>
       <div id="material-content"></div>
+    </dialog>
+    <dialog id="syllabus-dialog">
+      <div class="dialog-heading">
+        <h2>Задания из силлабуса</h2>
+        <button
+          class="icon-button"
+          data-close="syllabus-dialog"
+          aria-label="Закрыть"
+        >
+          ×
+        </button>
+      </div>
+      <p class="muted">
+        Проверь каждую цитату. Заполни недостающие поля и сохрани только нужные
+        задания.
+      </p>
+      <div id="syllabus-results"></div>
     </dialog>
     <dialog id="confirm-dialog">
       <h2 id="confirm-title"></h2>

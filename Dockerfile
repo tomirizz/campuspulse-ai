@@ -8,4 +8,4 @@ COPY web ./web
 RUN useradd --create-home --uid 10001 campuspulse && mkdir /app/data && chown campuspulse /app/data
 USER campuspulse
 EXPOSE 8080
-CMD ["sh", "-c", "exec python -m uvicorn campuspulse.server:app --host 0.0.0.0 --port ${PORT:-8080}"]
+CMD ["sh", "-c", "exec python -m uvicorn campuspulse.server:app --host 0.0.0.0 --port ${PORT:-8080} --no-access-log"]

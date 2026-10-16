@@ -1,0 +1,98 @@
+{
+  "version": "0.3.0",
+  "verified_at_utc": "2026-10-16T19:03:26.850045+00:00",
+  "scope": "Local implementation and contract tests; no live Google AI or Calendar claims",
+  "tests": {
+    "command": ".venv/bin/python -m pytest -q",
+    "passed": 77,
+    "failed": 0,
+    "warnings": [
+      "Starlette test-client deprecation warning for httpx; no test failure"
+    ]
+  },
+  "checks": {
+    "javascript_syntax": [
+      "web/app.js",
+      "web/game.js",
+      "web/features.js"
+    ],
+    "git_diff_check": "passed"
+  },
+  "browser": {
+    "data": "Synthetic syllabus and test session in work/v03-preview, isolated from user data",
+    "verified": [
+      "Calendar incomplete request asks for date and time",
+      "Complete calendar draft states not created when disconnected",
+      "Syllabus exact source and missing-field review; manual task save",
+      "Cross-material search UI returns exact line and 0.01 from uploaded text",
+      "Grade form: target 85, 60% at 80/100, 40% unknown => 92.50/100",
+      "Two approved term-definition quest questions => 2/2, 100%, 20 XP",
+      "Python syntax error points to actual line 2",
+      "What-if preview redistributes blocks without changing preferences",
+      "Responsive layout at 325 CSS px: no horizontal overflow"
+    ],
+    "console_errors": [],
+    "screenshot": "docs/screenshots/v0.3-practice.png"
+  },
+  "google_contracts": [
+    "OAuth state/PKCE, replay rejection, session isolation, token encryption",
+    "Calendar events pagination and all-day exclusive end",
+    "Idempotent insert/409 recovery and overlap confirmation",
+    "No invitees or notification side effects",
+    "Gemini SDK function-call IDs and thought signatures preserved; actual local MCP process"
+  ],
+  "live": {
+    "gemini": "NOT_RUN",
+    "google_calendar_oauth": "NOT_RUN",
+    "google_calendar_real_event": "NOT_RUN",
+    "agent_engine": "NOT_DEPLOYED",
+    "cloud_run": "NOT_DEPLOYED",
+    "firestore": "NOT_RUN",
+    "reason": "Owner deferred cloud; application OAuth not configured"
+  },
+  "key_free_access": "End users need no API key. Application owner must configure Google credentials; current local mode is explicitly tools, not AI.",
+  "presentation": {
+    "status": "Unchanged previous draft; new presentation deferred by user",
+    "sha256": "a09b8b16ef38c39e2f737f2429c3fbb2183bd655180a85c09ada0abeb85f142e"
+  },
+  "source_sha256": {
+    "campuspulse/__init__.py": "6a01713a77cf5ed24a518a7ad313c8875d141482bc330b8bda239c4cdd98f6b3",
+    "campuspulse/agent.py": "e6afac219c8929a4b4f339906db9eb5c817d3e142bc5bb475208999cfb32a5a0",
+    "campuspulse/calendar_dialogue.py": "34e74896194a9d03e37e92c07bdcc3be13f7280107238a2d745ded786c509d87",
+    "campuspulse/dates.py": "a31e42a469d9f3b2c515018215de7947a343f6907fc598b513835e638538ac81",
+    "campuspulse/evidence.py": "4de5c43ed0f2812c4024e248d225f3e4102056b529a24bf2a1e5aba910a439a0",
+    "campuspulse/features_api.py": "fffc9b47514688e484a1cc2a08c0b2f529a32d310121c709594d4d791e08fcad",
+    "campuspulse/google_calendar.py": "0fc2b4eec8bae4bc5b66e6dd6ce1c5e09df0e068a65efafb56719a6b8cef305e",
+    "campuspulse/mcp_server.py": "5a6ba2c687922b7b9830feaf5bb2a83697e03dfec1478209099d4f3d547d8532",
+    "campuspulse/models.py": "3789623fd5ed261b4d78e1e8082ca7b8a7fcacb5c6b08b79283c832010149010",
+    "campuspulse/planner.py": "c430a88198c765807e77d78b4b0a6277a5158f7d415ca3d1d59d2031349a9a59",
+    "campuspulse/progress.py": "c4d655d6e16414a8e51746283afbe826dfc5361755302e011af4c6abb62a09d6",
+    "campuspulse/quests.py": "edd6bf7af1a9448c040c2b4c1f21e52257725062f35639dcb02e177a11cbf637",
+    "campuspulse/server.py": "8bad5ea40fb81ac5252bf00cf580e66b5a9eaee737e0256c70250c28dc113fb2",
+    "campuspulse/storage.py": "fae103b96ed91bf619e55c25d3b64dbbb2ff618c7178e94c68be2b0c1aec8bc1",
+    "campuspulse/study.py": "f63c5fcf93eb5ed4c5ddcf423600c613c0fa14d14af7003aa61e6ebdf49ea3b1",
+    "campuspulse/tools.py": "8eb6438d7e685182a393939b7851622bf243bc6602c46e83a790365d1c463c0f",
+    "scripts/deploy_agent.py": "848754e263fd15160b50de26272eb4d8c096b829eb1edb8e61593687f21f9932",
+    "scripts/deploy_web.sh": "a8f76bb7d67364112bf99280030c08199b93180295d32fca465472650432de51",
+    "scripts/preflight.py": "2b742417828c5ff908b1b1f85d455cfdacd6d48c2591cbcdd9e8e442c60a3e26",
+    "scripts/run.sh": "121e21ae60676d630490e7884ce38abf65efa9dd69e16f725d9f0f8d7780d577",
+    "scripts/setup_gcp.sh": "e849532c7be9ab83ffb2247a1cadc3de2afc305e9e831dd58c9d920ecb814116",
+    "scripts/start_web.py": "ba7c4b4179bd80da6538de59342d70ebc496d4a4bdc3e5a10ce52917a78c950b",
+    "scripts/verify_cloud.py": "0089521304a96c5ebf0b439ede0a4827a5d7c68954e78be14319c138235b4c89",
+    "tests/test_agent.py": "af0ef322884f59fc76f4572d0dd1df19757c4ead41001699998252750b06f005",
+    "tests/test_api.py": "b98af9b27025efbe0bb848a5eb468f36b3d7a14742d7dcfed8429bd69b8d1d29",
+    "tests/test_calendar.py": "65f529f014eef92dbcdb5638b600ed81a13dc07cd0b29bba534858f57148daac",
+    "tests/test_evidence.py": "09ea6e3e10e504ec95ae311b8c4f2ce1d8cdfee1816b4e7a778e30d3a3e0f234",
+    "tests/test_features_api.py": "fd3104b663801df504d79b7dd916cbb437fde7704ecf081debe4896bb725c17d",
+    "tests/test_planner.py": "b1dd2792a556cbe1be9e8713017b66865df9952bcb8f5177c067ff488d4eb15b",
+    "tests/test_progress.py": "7cc5ee2719177c0d51c5386f63dcd13619cc18401b3ac7c11e716acf20724d83",
+    "tests/test_study.py": "2c30163e7a78af0e84c12261ad19ce4753c57313b0dd4d46e15ca68f65ae25d8",
+    "web/app.js": "ed1fa78188cac5acbd27214cc286bb35b90a68dd59cf2571507351460038315b",
+    "web/features.css": "3bd9ce6d2a3a5bebffdec2ed7d62ecb11723216da1e085a9a5146021584503df",
+    "web/features.js": "8eca19d66b7ff6a593aa39ba34032bc65d5ce5321eb3ca2537f4ce544311e542",
+    "web/game.js": "3c696bd1469a1f042a990ce699d28355e7ba60d8c61638106f4401aec21e23b1",
+    "web/index.html": "cdcb1661e3fc506c7ab9b1e636839ad1d51a41336a58422c83702acd19b011b7",
+    "web/style.css": "76deb4b83e52369dad0dc68082289ba251f7e0d442fa637bd35dadfbb5d3333d",
+    "web/theme.css": "4b650497b87bdf5cc10e3c01f2da00c8de4583e0c0969983bda23c26b5c03b48"
+  }
+}

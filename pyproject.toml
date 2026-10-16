@@ -1,13 +1,13 @@
 [project]
 name = "campuspulse-ai"
-version = "0.2.0"
+version = "0.3.0"
 description = "CampusPulse AI — GDG Astana student agent with Gemini, MCP and Vertex AI Agent Engine"
 requires-python = ">=3.11,<3.14"
 dependencies = [
   "fastapi==0.143.3", "uvicorn==0.54.0", "python-multipart==0.0.32",
   "google-genai==1.75.0", "google-cloud-aiplatform[agent_engines]==1.165.1",
   "google-cloud-firestore==2.34.1", "mcp==1.30.0", "httpx==0.28.1",
-  "pypdf==6.21.0", "python-dotenv==1.2.4", "jsonschema==4.26.0",
+  "pypdf==6.21.0", "python-dotenv==1.2.4", "jsonschema==4.26.0", "cryptography==50.0.2",
 ]
 
 [project.optional-dependencies]

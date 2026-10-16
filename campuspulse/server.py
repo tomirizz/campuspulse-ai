@@ -15,17 +15,20 @@ from fastapi.staticfiles import StaticFiles
 from pypdf import PdfReader
 
 from campuspulse.agent import gemini_run, tools_only_run
-from campuspulse.models import ChatInput, GitHubInput, Preferences, TaskInput, TaskPatch
+from campuspulse.models import ChatInput, Preferences, TaskInput, TaskPatch
 from campuspulse.planner import calendar_export, plan_week
 from campuspulse.storage import make_store
 from campuspulse.tools import ToolHub
-from campuspulse.local_agent import local_run, local_status
+from campuspulse.calendar_dialogue import calendar_dialogue
+from campuspulse.google_calendar import connection_status
+from campuspulse.features_api import register_features, sync_calendar, with_calendar
+from campuspulse.study import validate_source, scenario_from_message
 from campuspulse.progress import progress, metrics, task_proof, complete_task, proof
 from fastapi.exceptions import RequestValidationError
 
 load_dotenv()
 ROOT = Path(__file__).resolve().parent.parent
-app = FastAPI(title="CampusPulse AI", version="0.2.0", docs_url="/api/docs")
+app = FastAPI(title="CampusPulse AI", version="0.3.0", docs_url="/api/docs")
 store = make_store()
 chat_slots = asyncio.Semaphore(4)
 active_sessions: set[str] = set()
@@ -46,26 +49,45 @@ async def session_boundary(request: Request, call_next):
     if new_session:
         response.set_cookie("campuspulse_session", sid, httponly=True,
                             secure=os.getenv("COOKIE_SECURE", "false").lower() == "true",
-                            samesite="strict", max_age=60 * 60 * 24 * 30)
+                            samesite="lax", max_age=60 * 60 * 24 * 30)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "no-referrer"
     response.headers["Content-Security-Policy"] = "default-src 'self'; style-src 'self'; img-src 'self' data:; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
     if request.url.path.startswith("/api/"):
         response.headers["Cache-Control"] = "no-store"
+    else:
+        response.headers["Cache-Control"] = "no-cache"
     return response
 
 
 def workspace(sid):
     return {"tasks": store.list(sid, "tasks"), "materials": store.list(sid, "materials"),
-            "preferences": store.get(sid, "meta", "preferences") or Preferences().model_dump(mode="json")}
+            "preferences": {**Preferences().model_dump(mode="json"), **(store.get(sid, "meta", "preferences") or {})},
+            "quest_rewards": store.list(sid, "quest_rewards"),
+            **{key: store.get(sid, "meta", key) for key in ("grade_config", "diagnostic", "scenario_input", "calendar_cache", "calendar_draft", "google_notice")}}
+
+
+def effective_mode():
+    mode = os.getenv("AGENT_MODE", "auto")
+    if mode in {"auto", "local"}:
+        if os.getenv("ENGINE_RESOURCE_NAME"):
+            return "remote"
+        if os.getenv("GOOGLE_CLOUD_PROJECT"):
+            try:
+                import google.auth
+                google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+                return "gemini"
+            except Exception:
+                pass
+        return "tools"
+    return mode
 
 
 @app.get("/api/health")
 async def health():
-    mode = os.getenv("AGENT_MODE", "local")
-    return {"ok": True, "version": "0.2.0", "mode": mode,
-            "local": await local_status(),
-            "model": os.getenv("LOCAL_MODEL", "qwen3:1.7b") if mode == "local" else os.getenv("GEMINI_MODEL", "gemini-3.6-flash") if mode != "tools" else None,
+    mode = effective_mode()
+    return {"ok": True, "version": "0.3.0", "mode": mode,
+            "model": os.getenv("GEMINI_MODEL", "gemini-3.6-flash") if mode != "tools" else None,
             "storage": os.getenv("STORAGE_BACKEND", "sqlite"),
             "cloud_configured": bool(os.getenv("ENGINE_RESOURCE_NAME")),
             "cloud_verified": False,
@@ -81,7 +103,9 @@ def get_workspace(request: Request):
         if turn.get("role") == "model" and not turn.get("why"):
             turn["text"] = "Сохранён ответ предыдущей версии без карточек источников. Задайте вопрос ещё раз для проверяемого ответа."
             turn["why"] = {"title": "Почему старый ответ скрыт", "source": "История v0.1", "result": "В записи нет источников нового формата. Система не выдаёт её за проверенный ответ."}
-    data["progress"] = progress(data["tasks"], data["preferences"])
+    data["progress"] = progress(data["tasks"], data["preferences"], quest_rewards=data["quest_rewards"])
+    data["google"] = connection_status(store, request.state.sid)
+    data["quests"] = [{"id": q["id"], "material": q["material"], "answered": len(q["answers"]), "total": len(q["questions"])} for q in store.list(request.state.sid, "quests")]
     data["metrics"] = metrics(data["tasks"])
     data["tasks"] = [{**t, "why": task_proof(t)} for t in data["tasks"]]
     return data
@@ -94,6 +118,11 @@ def add_task(body: TaskInput, request: Request):
         raise HTTPException(400, "В первой версии доступно до 100 заданий")
     task = {**body.model_dump(mode="json"), "id": uuid.uuid4().hex, "completed": False,
             "created_at": datetime.now(timezone.utc).isoformat()}
+    if task.get("source"):
+        try:
+            task["source"] = validate_source(store.list(sid, "materials"), task["source"])
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
     store.put(sid, "tasks", task["id"], task)
     return {**task, "why": task_proof(task)}
 
@@ -108,7 +137,13 @@ def patch_task(task_id: str, body: TaskPatch, request: Request):
 
 @app.put("/api/tasks/{task_id}")
 def edit_task(task_id: str, body: TaskInput, request: Request):
-    task = store.update(request.state.sid, "tasks", task_id, lambda t: {**t, **body.model_dump(mode="json")})
+    payload = body.model_dump(mode="json")
+    if body.source:
+        try:
+            payload["source"] = validate_source(store.list(request.state.sid, "materials"), body.source.model_dump())
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+    task = store.update(request.state.sid, "tasks", task_id, lambda t: {**t, **payload})
     if not task:
         raise HTTPException(404, "Задание не найдено")
     return {**task, "why": task_proof(task)}
@@ -130,14 +165,22 @@ def preferences(body: Preferences, request: Request):
 
 
 @app.get("/api/plan")
-def plan(request: Request):
+async def plan(request: Request):
     data = workspace(request.state.sid)
-    return plan_week(data["tasks"], data["preferences"])
+    if connection_status(store, request.state.sid)["connected"]:
+        try:
+            data["calendar_cache"] = await sync_calendar(store, request.state.sid, data["preferences"])
+        except ValueError as exc:
+            raise HTTPException(503, str(exc)) from exc
+    data = with_calendar(data)
+    result = plan_week(data["tasks"], data["preferences"])
+    result["calendar"] = data.get("calendar_cache")
+    return result
 
 
 @app.get("/api/plan/calendar.ics")
-def export_plan(request: Request):
-    return Response(calendar_export(plan(request)), media_type="text/calendar",
+async def export_plan(request: Request):
+    return Response(calendar_export(await plan(request)), media_type="text/calendar",
                     headers={"Content-Disposition": 'attachment; filename="campuspulse-week.ics"'})
 
 
@@ -228,19 +271,28 @@ async def chat(body: ChatInput, request: Request):
         async with chat_slots, asyncio.timeout(175):
             context = workspace(sid)
             history = (store.get(sid, "meta", "history") or {}).get("turns", [])
-            mode = os.getenv("AGENT_MODE", "local")
-            if mode == "remote":
+            mode = effective_mode()
+            result = await calendar_dialogue(body.message, store, sid, context["preferences"])
+            context["user_message"] = body.message
+            context["scenario_input"] = scenario_from_message(body.message, context["preferences"]) or (context.get("scenario_input") if "сценари" in body.message.lower() else None)
+            code = re.search(r"```(python|json)\s*\n([\s\S]*?)```", body.message)
+            if code:
+                context["diagnostic_request"] = {"code": code[2], "language": code[1], "filename": "chat.py" if code[1] == "python" else "chat.json"}
+            if result is None and connection_status(store, sid)["connected"]:
+                context["calendar_cache"] = await sync_calendar(store, sid, context["preferences"])
+            context = with_calendar(context)
+            if result is not None:
+                pass
+            elif mode == "remote":
                 result = await asyncio.to_thread(remote_run, body.message, context, history)
             elif mode == "gemini":
                 result = await gemini_run(body.message, context, history)
             elif mode == "tools":
                 result = await tools_only_run(body.message, context)
-            elif mode == "local":
-                result = await local_run(body.message, context, history)
             else:
                 raise ValueError("Неизвестный режим AGENT_MODE")
             history += [{"role": "user", "text": body.message}, {"role": "model", "text": result["answer"],
-                         "why": result.get("why"), "evidence": result.get("evidence", []), "mode": result["mode"], "model": result.get("model")}]
+                         "why": result.get("why"), "evidence": result.get("evidence", []), "calendar": result.get("calendar"), "mode": result["mode"], "model": result.get("model")}]
             store.put(sid, "meta", "history", {"turns": history[-12:]})
             result["run_id"] = uuid.uuid4().hex
             return result
@@ -255,12 +307,6 @@ async def chat(body: ChatInput, request: Request):
         active_sessions.discard(sid)
 
 
-@app.post("/api/github")
-async def github(body: GitHubInput):
-    async with asyncio.timeout(40), ToolHub({}) as hub:
-        return await hub.call("github_issues", {"repository": body.repository})
-
-
 @app.delete("/api/workspace", status_code=204)
 def clear_workspace(request: Request):
     if request.state.sid in active_sessions:
@@ -268,6 +314,7 @@ def clear_workspace(request: Request):
     store.clear(request.state.sid)
 
 
+register_features(app, lambda: store, workspace)
 app.mount("/assets", StaticFiles(directory=ROOT / "web"), name="assets")
 
 

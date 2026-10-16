@@ -32,13 +32,14 @@ def task_proof(task):
                  "Это игровые баллы за самостоятельную отметку выполнения, не оценка знаний. Оценка времени фиксируется при первом завершении. Возврат в работу убирает XP; повторное завершение возвращает прежний XP. Удаление задания убирает его XP.")
 
 
-def progress(tasks, preferences=None, now=None):
+def progress(tasks, preferences=None, now=None, quest_rewards=None):
     tz = ZoneInfo((preferences or {}).get("timezone", "Asia/Almaty"))
     now = (now or datetime.now(timezone.utc)).astimezone(tz)
     done = [t for t in tasks if t.get("completed")]
     # Legacy completions have no invented completion dates and no retroactive rewards.
     credited = [t for t in done if t.get("reward_snapshot") and t.get("completed_at")]
-    total = sum(t["reward_snapshot"]["xp"] for t in credited)
+    quest_rewards = quest_rewards or []
+    total = sum(t["reward_snapshot"]["xp"] for t in credited) + sum(q["xp"] for q in quest_rewards)
     dates = {datetime.fromisoformat(t["completed_at"]).astimezone(tz).date() for t in credited}
     today = now.date()
     cursor = today if today in dates else today - timedelta(days=1)
@@ -51,7 +52,7 @@ def progress(tasks, preferences=None, now=None):
     daily = [t for t in credited if datetime.fromisoformat(t["completed_at"]).astimezone(tz).date() == today]
     earned = len(credited)
     evidence = {
-        "xp": proof("Общий опыт", "XP = сумма XP завершённых заданий", {"задания": [{"название": t["title"], "id": t["id"], "XP": t["reward_snapshot"]["xp"]} for t in credited]}, total,
+        "xp": proof("Общий опыт", "XP = сумма XP завершённых заданий + 10 × число уникальных освоенных фактов", {"задания": [{"название": t["title"], "id": t["id"], "XP": t["reward_snapshot"]["xp"]} for t in credited], "квесты": [{"id": q["id"], "XP": q["xp"]} for q in quest_rewards]}, total,
                     "Задания → completed, reward_snapshot; campuspulse/progress.py → progress", "Повторные отметки не суммируются. Баллы не измеряют успеваемость."),
         "level": proof("Уровень", "уровень = 1 + floor(XP / 100); прогресс = XP mod 100", {"XP": total}, 1 + total // 100,
                        "Правило progress-v1: порог уровня 100 XP"),
@@ -70,7 +71,8 @@ def progress(tasks, preferences=None, now=None):
             "weekly_percent": min(100, len(weekly) * 100 // 3), "daily_completed": len(daily),
             "badges": badges, "why": evidence, "rule_version": RULE_VERSION,
             "ledger": [{"task_id": t["id"], "title": t["title"], "xp": t["reward_snapshot"]["xp"],
-                        "at": t["completed_at"], "why": task_proof(t)} for t in sorted(credited, key=lambda t: t["completed_at"], reverse=True)]}
+                        "at": t["completed_at"], "why": task_proof(t)} for t in sorted(credited, key=lambda t: t["completed_at"], reverse=True)] +
+                       [{"task_id": q["id"], **q} for q in quest_rewards]}
 
 
 def metrics(tasks, now=None):

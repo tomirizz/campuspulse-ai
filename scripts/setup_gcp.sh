@@ -3,7 +3,7 @@
 set -euo pipefail
 PROJECT_ID="${1:?Usage: bash scripts/setup_gcp.sh PROJECT_ID}"
 REGION="${2:-us-central1}"
-gcloud services enable aiplatform.googleapis.com run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com firestore.googleapis.com storage.googleapis.com --project "$PROJECT_ID"
+gcloud services enable aiplatform.googleapis.com run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com firestore.googleapis.com storage.googleapis.com calendar-json.googleapis.com secretmanager.googleapis.com --project "$PROJECT_ID"
 if ! gcloud storage buckets describe "gs://${PROJECT_ID}-agent-staging" --project "$PROJECT_ID" >/dev/null 2>&1; then
   gcloud storage buckets create "gs://${PROJECT_ID}-agent-staging" --project "$PROJECT_ID" --location "$REGION" --uniform-bucket-level-access
 fi

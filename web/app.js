@@ -22,6 +22,7 @@ const names = {
   tasks: "Миссии",
   week: "Моя неделя",
   materials: "Материалы",
+  practice: "Практика",
   settings: "Подключения и данные",
 };
 const paths = {
@@ -215,6 +216,7 @@ async function refresh() {
   renderPreferences();
   renderHealth();
   renderProgress();
+  renderFeatures();
 }
 function deadline(task) {
   const hours = (new Date(task.due_at) - new Date()) / 36e5;
@@ -305,6 +307,14 @@ function taskRow(task, full = false) {
       ),
     );
     row.append(actions);
+    if (task.source)
+      content.append(
+        button(
+          "Источник задания ↗",
+          () => openSource(task.source),
+          "text-button",
+        ),
+      );
   }
   return row;
 }
@@ -392,7 +402,20 @@ function openTask(task = null) {
   $("#task-title").value = task?.title || "";
   $("#task-course").value = task?.course || "";
   $("#task-due").value = task?.due_at ? wallTime(task.due_at) : "";
-  $("#task-minutes").value = task?.estimated_minutes || 60;
+  $("#task-minutes").value = task?.source
+    ? (task.estimated_minutes ?? "")
+    : task?.estimated_minutes || 60;
+  state.taskSource = task?.source || null;
+  $("#task-source-preview").replaceChildren();
+  if (state.taskSource)
+    $("#task-source-preview").append(
+      quoteCard(state.taskSource),
+      el(
+        "p",
+        "muted",
+        "Проверь цитату и заполни поля. Сохранённые значения будут подтверждены тобой.",
+      ),
+    );
   $("#task-priority").value = task?.priority || "normal";
   $("#task-notes").value = task?.notes || "";
   $("#task-tz").textContent = zone();
@@ -414,6 +437,7 @@ $("#task-form").addEventListener("submit", async (event) => {
         estimated_minutes: Number($("#task-minutes").value),
         priority: $("#task-priority").value,
         notes: $("#task-notes").value,
+        source: state.taskSource,
       }),
     });
     $("#task-dialog").close();
@@ -432,6 +456,7 @@ function renderPreferences() {
   $("#pref-minutes").value = p.daily_minutes;
   $("#pref-start").value = p.start_hour;
   $("#pref-end").value = p.end_hour;
+  $("#pref-event-minutes").value = p.event_minutes || 60;
   renderBusy();
 }
 function renderBusy() {
@@ -482,6 +507,7 @@ $("#preferences-form").addEventListener("submit", async (event) => {
         start_hour: Number($("#pref-start").value),
         end_hour: Number($("#pref-end").value),
         busy: state.busy,
+        event_minutes: Number($("#pref-event-minutes").value),
       }),
     });
     await loadPlan();
@@ -494,6 +520,10 @@ $("#preferences-form").addEventListener("submit", async (event) => {
 async function loadPlan() {
   try {
     const p = await api("/plan");
+    if (p.calendar) {
+      state.calendar_cache = p.calendar;
+      renderCalendar();
+    }
     $("#plan-summary").textContent =
       `${p.scheduled_minutes} минут запланировано · ${p.sessions.length} ${plural(p.sessions.length, ["учебный блок", "учебных блока", "учебных блоков"])} · ${p.timezone}`;
     $("#plan-summary").append(whyButton(p.why));
@@ -601,6 +631,13 @@ function renderMaterials() {
           toast(e.message, true);
         }
       }),
+      button("Разобрать силлабус", () => showSyllabus(m)),
+      button("Квест по материалу", () => {
+        showView("practice");
+        selectPractice("quests");
+        $("#quest-material").value = m.id;
+        $("#quest-source-form").requestSubmit();
+      }),
       button("Обсудить", () => {
         showView("chat");
         $("#chat-input").value =
@@ -622,40 +659,39 @@ function renderMaterials() {
 }
 function renderHealth() {
   const h = state.health;
-  const local = h.mode === "local";
-  const title = local
-    ? h.local?.ready
-      ? "Локальный ИИ · без ключа"
-      : "Локальный ИИ ожидает запуска"
-    : h.mode === "tools"
-      ? "Инструменты · без ИИ"
-      : "Gemini · облачный режим";
-  const banner = $("#mode-banner");
-  $("strong", banner).textContent = title;
-  $(":scope > div > span", banner).textContent = local
-    ? h.local?.ready
-      ? "Модель на этом компьютере. Числа и источники проверяет код."
-      : h.local?.reason
-    : "Все расчёты выполняет код, у ответов есть источники.";
-  $("#chat-mode").textContent =
-    title + ". Ассистент выбирает инструменты и проверяемые факты.";
+  const title =
+    h.mode === "tools"
+      ? "Google Gemini ожидает подключения"
+      : h.mode === "remote"
+        ? "Google Gemini · Agent Engine"
+        : "Google Gemini · Vertex AI";
+  $("strong", $("#mode-banner")).textContent = title;
+  $(":scope > div > span", $("#mode-banner")).textContent =
+    h.mode === "tools"
+      ? "Формулы, поиск, квесты и календарный диалог доступны без ИИ."
+      : "Ответы с источниками. Успешный вызов подтверждается журналом.";
+  $("#chat-mode").textContent = title + ". API-ключ пользователю не нужен.";
   const cards = $("#integration-cards");
   cards.replaceChildren();
   [
     [
-      "Локальный ИИ",
-      h.local?.reason || "Проверка при запуске",
-      h.local?.ready ? h.local.model : "Запустите файл с локальным ИИ",
+      "Google Gemini",
+      "Единственная ИИ-модель проекта. Сервер входит в Google через авторизацию, без ключа пользователя.",
+      h.mode === "tools"
+        ? "Ожидает настройки Google Cloud"
+        : "Настроен; доступ проверяется при запросе",
     ],
     [
-      "MCP и формулы",
-      "Время и GitHub через отдельный сервер. План и опыт — по фиксированным правилам.",
-      "Данные проверяются при вызове",
+      "Google Calendar",
+      "События основного календаря, уточнение даты и времени, проверка пересечений.",
+      state.google?.connected
+        ? "Разрешение сохранено"
+        : "Нужно подключить Google",
     ],
     [
-      "Google Cloud / Gemini",
-      "Сохранён для критериев хакатона. Развёртывание отложено; локальная модель его не заменяет.",
-      "Ожидает облачного запуска",
+      "MCP и собственные функции",
+      "Часы сервера, точные цитаты, формулы, синтаксический анализ и журнал действий.",
+      "Вычисления выполняет код",
     ],
   ].forEach(([title, desc, status]) => {
     const card = el("article", "integration-card");
@@ -667,6 +703,7 @@ function renderHealth() {
     cards.append(card);
   });
 }
+
 function appendSafeText(parent, text) {
   const pattern = /https:\/\/github\.com\/[A-Za-z0-9_.\/-]+/g;
   let last = 0;
@@ -681,7 +718,14 @@ function appendSafeText(parent, text) {
   }
   parent.append(document.createTextNode(text.slice(last)));
 }
-function addMessage(role, text, proposals = [], evidence = [], why = null) {
+function addMessage(
+  role,
+  text,
+  proposals = [],
+  evidence = [],
+  why = null,
+  calendar = null,
+) {
   const area = $("#messages");
   $(".chat-welcome", area)?.remove();
   const message = el("article", "message " + role);
@@ -714,6 +758,17 @@ function addMessage(role, text, proposals = [], evidence = [], why = null) {
       message.append(sources);
     }
   }
+  if (calendar?.status === "created" && safeCalendarUrl(calendar.url)) {
+    const link = el(
+      "a",
+      "button secondary",
+      "Открыть событие в Google Calendar ↗",
+    );
+    link.href = calendar.url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    message.append(link);
+  }
   proposals.forEach((p) => {
     const box = el("div", "proposal");
     box.append(
@@ -742,6 +797,7 @@ function renderHistory() {
         [],
         m.evidence || [],
         m.why,
+        m.calendar,
       ),
     );
     return;
@@ -759,7 +815,9 @@ function renderHistory() {
   [
     "Составь план моей учебной недели",
     "Покажи мои ближайшие дедлайны",
-    "Проверь GitHub issues в googleapis/python-genai",
+    "Запланируй хакатон",
+    "Что если 2 часа в день?",
+    "Разбери мой силлабус",
   ].forEach((p) =>
     welcome.append(
       button(p, () => {
@@ -832,12 +890,16 @@ $("#chat-form").addEventListener("submit", async (event) => {
       result.proposals || [],
       result.evidence || [],
       result.why,
+      result.calendar,
     );
     renderTrace(result.trace);
+    await refresh();
     $("#chat-mode").textContent =
-      result.mode === "tools"
-        ? "Команда выполнена без ИИ · реальные инструменты"
-        : `Ответ получен · ${result.model} · ${result.mode === "remote" ? "Google Cloud Agent Engine" : result.mode === "local" ? "локально, без ключа" : "Gemini"}`;
+      result.mode === "command"
+        ? "Календарный диалог · явная команда и проверка данных"
+        : result.mode === "tools"
+          ? "Команда выполнена без ИИ · реальные инструменты"
+          : `Ответ получен · ${result.model} · ${result.mode === "remote" ? "Google Cloud Agent Engine" : "Gemini"}`;
   } catch (e) {
     busy.remove();
     addMessage("error", e.message);
@@ -876,51 +938,6 @@ $("#export-trace").onclick = () => {
   link.click();
   URL.revokeObjectURL(url);
 };
-$("#github-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const b = $("button", e.target);
-  b.disabled = true;
-  $("#github-result").textContent = "Запрашиваю GitHub через MCP…";
-  try {
-    const result = await api("/github", {
-      method: "POST",
-      body: JSON.stringify({ repository: $("#github-repo").value.trim() }),
-    });
-    const out = $("#github-result");
-    out.replaceChildren();
-    if (result.error) throw new Error(result.error);
-    out.append(
-      el(
-        "p",
-        "muted",
-        `Получено ${dateLabel(result.fetched_at)} в ${timeLabel(result.fetched_at)}. ${result.coverage}`,
-      ),
-    );
-    if (!result.issues.length)
-      out.append(el("p", "", "Открытых issues в выборке нет."));
-    result.issues.forEach((i) => {
-      const a = el("a", "", `#${i.number} ${i.title}`);
-      a.href = i.url;
-      a.target = "_blank";
-      a.rel = "noopener noreferrer";
-      out.append(
-        a,
-        whyButton({
-          title: "Источник GitHub",
-          source: i.url,
-          formula: "Поля number и title из свежего ответа GitHub API",
-          inputs: { получено: result.fetched_at },
-          result: i.title,
-        }),
-      );
-    });
-  } catch (e) {
-    $("#github-result").textContent = e.message;
-    toast(e.message, true);
-  } finally {
-    b.disabled = false;
-  }
-});
 $("#add-demo").onclick = async () => {
   if (state.tasks.some((t) => t.notes.startsWith("Учебный пример"))) {
     toast("Учебный пример уже добавлен");
@@ -973,6 +990,7 @@ $("#clear-data").onclick = async () => {
 };
 async function start() {
   initGame();
+  initFeatures();
   try {
     state.health = await api("/health");
     await refresh();
