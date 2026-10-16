@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#153c32" />
+    <title>CampusPulse — учебная неделя под контролем</title>
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/assets/style.css" />
+    <script src="/assets/app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">К содержимому</a>
+    <aside class="sidebar">
+      <a href="#overview" class="brand" aria-label="CampusPulse, обзор"
+        ><span class="brand-mark">cp<span>✳</span></span
+        ><span>CampusPulse<small>ТВОЙ УЧЕБНЫЙ РИТМ</small></span></a
+      >
+      <div class="workspace-label">МОЁ ПРОСТРАНСТВО</div>
+      <nav aria-label="Главная навигация">
+        <button data-view="overview" class="nav-item active">
+          <span data-icon="grid"></span>Обзор<span class="nav-dot"></span>
+        </button>
+        <button data-view="chat" class="nav-item">
+          <span data-icon="spark"></span>AI-ассистент<span class="tiny"
+            >AI</span
+          >
+        </button>
+        <button data-view="tasks" class="nav-item">
+          <span data-icon="check"></span>Задания<span
+            class="count"
+            id="nav-count"
+            >0</span
+          >
+        </button>
+        <button data-view="week" class="nav-item">
+          <span data-icon="calendar"></span>Моя неделя
+        </button>
+        <button data-view="materials" class="nav-item">
+          <span data-icon="book"></span>Материалы
+        </button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="sidebar-note">
+          <span class="small-spark">✳</span
+          ><strong>Учись в своём темпе</strong>
+          <p>Большие задачи становятся проще, когда есть понятный план.</p>
+        </div>
+        <button data-view="settings" class="nav-item">
+          <span data-icon="settings"></span>Подключения и данные
+        </button>
+        <div class="profile">
+          <span class="avatar">С</span>
+          <div>Студент<small>Личное пространство</small></div>
+          <span class="profile-dot"></span>
+        </div>
+      </div>
+    </aside>
+    <div class="shell">
+      <header class="topbar">
+        <div class="breadcrumb">
+          Моё пространство <span>/</span> <strong id="page-name">Обзор</strong>
+        </div>
+        <div class="top-right">
+          <span id="top-date"></span><span class="version">v0.1</span
+          ><span class="avatar small">С</span>
+        </div>
+      </header>
+      <main id="main">
+        <section id="view-overview" class="view">
+          <div class="page-heading">
+            <div>
+              <div class="eyebrow">МЕНЬШЕ ХАОСА, БОЛЬШЕ ФОКУСА</div>
+              <h1>
+                Твоя неделя.<br />Всё на своих местах<span class="green"
+                  >.</span
+                >
+              </h1>
+              <p class="subtitle">
+                Задания, материалы и следующий шаг — в одном пространстве.
+              </p>
+            </div>
+            <button class="button primary" data-action="new-task">
+              <span data-icon="plus"></span>Добавить задание
+            </button>
+          </div>
+          <div id="mode-banner" class="mode-banner">
+            <span class="status-dot amber"></span>
+            <div>
+              <strong>Режим инструментов</strong
+              ><span
+                >Планирование и MCP доступны. Gemini ещё не подключён.</span
+              >
+            </div>
+            <button data-view="settings">Подробнее <span>↗</span></button>
+          </div>
+          <div class="stats">
+            <article class="stat">
+              <div class="stat-label">
+                В работе<span data-icon="check"></span>
+              </div>
+              <strong id="stat-open">0<span>заданий</span></strong
+              ><small id="stat-open-note">Начни с одного небольшого шага</small>
+            </article>
+            <article class="stat">
+              <div class="stat-label">
+                Ближайшие 48 часов<span data-icon="clock"></span>
+              </div>
+              <strong id="stat-due">0<span>дедлайнов</span></strong
+              ><small>С учётом твоего часового пояса</small>
+            </article>
+            <article class="stat">
+              <div class="stat-label">
+                Учебная нагрузка<span data-icon="calendar"></span>
+              </div>
+              <strong id="stat-hours">0<span>часов</span></strong
+              ><small>Оценка по открытым заданиям</small>
+            </article>
+          </div>
+          <div class="overview-grid">
+            <article class="assistant-card">
+              <div class="label-light">
+                <span class="spark-badge">✳</span> CAMPUSPULSE ASSISTANT
+              </div>
+              <h2>С чего начнём<br />сегодня?</h2>
+              <p>
+                Собери реалистичный план, проверь сроки или разберись с
+                материалом лекции.
+              </p>
+              <div class="prompt-list">
+                <button data-prompt="Составь план моей учебной недели">
+                  <span data-icon="calendar"></span>Спланировать неделю<span
+                    >↗</span
+                  ></button
+                ><button data-prompt="Какие у меня ближайшие дедлайны?">
+                  <span data-icon="clock"></span>Проверить дедлайны<span
+                    >↗</span
+                  ></button
+                ><button
+                  data-prompt="Помоги разобраться в загруженном материале лекции"
+                >
+                  <span data-icon="book"></span>Разобрать материал<span
+                    >↗</span
+                  >
+                </button>
+              </div>
+              <div class="assistant-card-footer">
+                <span class="status-dot"></span>Действия и источники всегда
+                видны
+              </div>
+              <div class="orbit" aria-hidden="true"><span>✳</span></div>
+            </article>
+            <article class="panel upcoming">
+              <div class="panel-heading">
+                <h2>На очереди</h2>
+                <button class="text-button" data-view="tasks">
+                  Все задания ↗
+                </button>
+              </div>
+              <div id="upcoming-list"></div>
+              <div class="tip">
+                <span>↳</span>
+                <p>
+                  <strong>План, который учитывает тебя</strong><br />Задай
+                  удобные часы и дневную нагрузку во вкладке «Моя неделя».
+                </p>
+              </div>
+            </article>
+          </div>
+          <div class="bottom-note">
+            <span>Сделано для студенческой жизни</span
+            ><span>GDG Astana · Build with AI</span>
+          </div>
+        </section>
+        <section id="view-chat" class="view" hidden>
+          <div class="section-heading">
+            <div>
+              <div class="eyebrow">ОТ ВОПРОСА К ДЕЙСТВИЮ</div>
+              <h1>AI-ассистент<span class="green">.</span></h1>
+              <p class="subtitle" id="chat-mode">
+                Ответы с источниками и понятным журналом действий.
+              </p>
+            </div>
+            <button class="button secondary" id="export-trace" disabled>
+              Скачать журнал
+            </button>
+          </div>
+          <div class="chat-layout">
+            <div class="chat-panel">
+              <div
+                id="messages"
+                aria-live="polite"
+                aria-relevant="additions"
+              ></div>
+              <form id="chat-form" class="composer">
+                <label class="sr-only" for="chat-input"
+                  >Сообщение ассистенту</label
+                ><textarea
+                  id="chat-input"
+                  rows="2"
+                  maxlength="4000"
+                  placeholder="Например: составь план недели с учётом дедлайнов"
+                  required
+                ></textarea>
+                <div>
+                  <span id="chat-hint"
+                    >Enter — отправить · Shift + Enter — новая строка</span
+                  ><button
+                    class="send-button"
+                    type="submit"
+                    aria-label="Отправить сообщение"
+                  >
+                    <span data-icon="arrow"></span>
+                  </button>
+                </div>
+              </form>
+            </div>
+            <aside class="trace-panel">
+              <div class="panel-heading">
+                <h2>Журнал действий</h2>
+                <span class="tag">Tools</span>
+              </div>
+              <p class="muted">
+                Здесь видны реальные вызовы инструментов и результаты.
+              </p>
+              <div id="trace-list" aria-live="polite">
+                <div class="empty compact">
+                  <span data-icon="activity"></span>
+                  <p>Журнал появится после запроса</p>
+                </div>
+              </div>
+            </aside>
+          </div>
+        </section>
+        <section id="view-tasks" class="view" hidden>
+          <div class="section-heading">
+            <div>
+              <div class="eyebrow">ПО ОДНОЙ ЗАДАЧЕ ЗА РАЗ</div>
+              <h1>Задания<span class="green">.</span></h1>
+              <p class="subtitle">
+                Дедлайны и оценки времени, на которые можно опереться.
+              </p>
+            </div>
+            <button class="button primary" data-action="new-task">
+              <span data-icon="plus"></span>Добавить задание
+            </button>
+          </div>
+          <div class="toolbar">
+            <div class="segmented" id="task-filters">
+              <button data-filter="open" class="selected">В работе</button
+              ><button data-filter="all">Все</button
+              ><button data-filter="done">Готово</button>
+            </div>
+            <label class="search"
+              ><span data-icon="search"></span
+              ><input
+                id="task-search"
+                placeholder="Найти задание или курс"
+                aria-label="Поиск заданий"
+            /></label>
+          </div>
+          <div id="task-list"></div>
+        </section>
+        <section id="view-week" class="view" hidden>
+          <div class="section-heading">
+            <div>
+              <div class="eyebrow">ПЛАН, В КОТОРОМ ЕСТЬ МЕСТО ЖИЗНИ</div>
+              <h1>Моя неделя<span class="green">.</span></h1>
+              <p class="subtitle">
+                Ближайшие 7 дней. Сначала — самые близкие дедлайны.
+              </p>
+            </div>
+            <a class="button secondary" href="/api/plan/calendar.ics"
+              ><span data-icon="download"></span>В календарь</a
+            >
+          </div>
+          <form id="preferences-form" class="preferences panel">
+            <label
+              >Часовой пояс<select id="pref-zone">
+                <option value="Asia/Almaty">Астана / Алматы (UTC+5)</option>
+                <option value="Europe/Moscow">Москва (UTC+3)</option>
+                <option value="UTC">UTC</option>
+              </select></label
+            ><label
+              >Минут в день<input
+                id="pref-minutes"
+                type="number"
+                min="30"
+                max="480"
+                step="15"
+                required /></label
+            ><label
+              >Начинаю в<input
+                id="pref-start"
+                type="number"
+                min="0"
+                max="22"
+                required /></label
+            ><label
+              >Заканчиваю в<input
+                id="pref-end"
+                type="number"
+                min="1"
+                max="24"
+                required /></label
+            ><button class="button primary" type="submit">Обновить план</button>
+            <details class="busy-details">
+              <summary>Занятые часы — пары, работа, встречи</summary>
+              <div id="busy-list"></div>
+              <div class="busy-add">
+                <label>С<input type="datetime-local" id="busy-start" /></label
+                ><label>До<input type="datetime-local" id="busy-end" /></label
+                ><button type="button" class="button secondary" id="add-busy">
+                  Добавить интервал
+                </button>
+              </div>
+            </details>
+          </form>
+          <div id="plan-summary"></div>
+          <div id="plan-risks"></div>
+          <div id="week-grid" class="week-grid"></div>
+        </section>
+        <section id="view-materials" class="view" hidden>
+          <div class="section-heading">
+            <div>
+              <div class="eyebrow">ЗНАНИЯ ПОД РУКОЙ</div>
+              <h1>Материалы<span class="green">.</span></h1>
+              <p class="subtitle">
+                Загрузи лекцию и задай ассистенту вопрос по содержанию.
+              </p>
+            </div>
+          </div>
+          <label class="upload-area" id="upload-area" for="material-upload"
+            ><span class="upload-icon" data-icon="upload"></span
+            ><strong>Добавить учебный материал</strong
+            ><span>Нажми, чтобы выбрать PDF, TXT или MD</span
+            ><small>До 5 МБ · до 20 страниц · PDF с текстовым слоем</small
+            ><input
+              type="file"
+              id="material-upload"
+              accept=".pdf,.txt,.md"
+              class="sr-only"
+          /></label>
+          <p class="privacy-note">
+            В режиме Gemini текст материалов передаётся Google для ответа.
+            Загружай только те файлы, которые готов(а) использовать с ИИ.
+          </p>
+          <div id="material-list" class="material-list"></div>
+        </section>
+        <section id="view-settings" class="view" hidden>
+          <div class="section-heading">
+            <div>
+              <div class="eyebrow">ПРОЗРАЧНО ПО УМОЛЧАНИЮ</div>
+              <h1>Подключения и данные<span class="green">.</span></h1>
+              <p class="subtitle">
+                Что работает сейчас и откуда берётся информация.
+              </p>
+            </div>
+          </div>
+          <div id="integration-cards" class="integration-grid"></div>
+          <article class="panel setting-panel">
+            <h2>Проверка GitHub через MCP</h2>
+            <p>
+              Получить свежие issues публичного репозитория. Данные
+              запрашиваются у GitHub в момент проверки.
+            </p>
+            <form id="github-form" class="inline-form">
+              <label class="sr-only" for="github-repo"
+                >Публичный репозиторий</label
+              ><input
+                id="github-repo"
+                placeholder="owner/repository"
+                pattern="[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"
+                required
+              /><button class="button primary" type="submit">Проверить</button>
+            </form>
+            <div id="github-result"></div>
+          </article>
+          <article class="panel setting-panel">
+            <h2>Твоё пространство</h2>
+            <p>
+              Задания, текст материалов и последние сообщения хранятся для этого
+              браузера. Локальная версия использует SQLite; облачная
+              конфигурация — Firestore. Без cookie восстановление пространства в
+              первой версии недоступно.
+            </p>
+            <div class="settings-actions">
+              <button class="button secondary" id="add-demo">
+                Добавить учебный пример</button
+              ><button class="button danger" id="clear-data">
+                Удалить мои данные
+              </button>
+            </div>
+            <small class="muted"
+              >Учебный пример создаёт три явно помеченных задания. Он не
+              используется как источник реальных данных.</small
+            >
+          </article>
+        </section>
+      </main>
+    </div>
+    <dialog id="task-dialog">
+      <form id="task-form">
+        <div class="dialog-heading">
+          <div>
+            <div class="eyebrow">НОВЫЙ ШАГ</div>
+            <h2 id="task-dialog-title">Добавить задание</h2>
+          </div>
+          <button
+            type="button"
+            class="icon-button"
+            data-close="task-dialog"
+            aria-label="Закрыть"
+          >
+            ×
+          </button>
+        </div>
+        <input type="hidden" id="task-id" /><label
+          >Что нужно сделать<input
+            id="task-title"
+            maxlength="160"
+            placeholder="Например: лабораторная по машинному обучению"
+            required /></label
+        ><label
+          >Курс<input
+            id="task-course"
+            maxlength="80"
+            placeholder="Название предмета"
+            required
+        /></label>
+        <div class="form-row">
+          <label
+            >Дедлайн <small id="task-tz"></small
+            ><input id="task-due" type="datetime-local" required /></label
+          ><label
+            >Время, минут<input
+              id="task-minutes"
+              type="number"
+              min="15"
+              max="2400"
+              value="60"
+              required
+          /></label>
+        </div>
+        <label
+          >Приоритет<select id="task-priority">
+            <option value="normal">Обычный</option>
+            <option value="high">Высокий</option>
+          </select></label
+        ><label
+          >Заметка<textarea
+            id="task-notes"
+            rows="2"
+            maxlength="2000"
+            placeholder="Что важно учесть"
+          ></textarea>
+        </label>
+        <div class="dialog-footer">
+          <button
+            type="button"
+            class="button secondary"
+            data-close="task-dialog"
+          >
+            Отмена</button
+          ><button type="submit" class="button primary">
+            Сохранить задание
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="material-dialog">
+      <div class="dialog-heading">
+        <h2 id="material-name">Материал</h2>
+        <button
+          class="icon-button"
+          data-close="material-dialog"
+          aria-label="Закрыть"
+        >
+          ×
+        </button>
+      </div>
+      <div id="material-content"></div>
+    </dialog>
+    <dialog id="confirm-dialog">
+      <h2 id="confirm-title"></h2>
+      <p id="confirm-text"></p>
+      <div class="dialog-footer">
+        <button class="button secondary" id="confirm-no">Отмена</button
+        ><button class="button danger" id="confirm-yes">Удалить</button>
+      </div>
+    </dialog>
+    <div id="toast" class="toast" role="status" hidden></div>
+  </body>
+</html>

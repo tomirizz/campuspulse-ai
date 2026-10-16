@@ -1,0 +1,15 @@
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store
+data/
+*.db*
+deployment.json
+evidence/live-*.json
+*.log
+credentials*.json
+*service-account*.json

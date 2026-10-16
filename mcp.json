@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "campuspulse": {
+      "command": ".venv/bin/python",
+      "args": ["-m", "campuspulse.mcp_server"],
+      "description": "Run from repository root. Real stdio MCP, public GitHub issues and current time."
+    }
+  }
+}
