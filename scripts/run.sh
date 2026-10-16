@@ -12,5 +12,6 @@ if [ ! -x .venv/bin/python ]; then
   fi
 fi
 if [ ! -f .env ]; then cp .env.example .env; fi
+if [ "${1:-}" = "--local-ai" ]; then exec .venv/bin/python scripts/local_start.py; fi
 echo "CampusPulse: http://127.0.0.1:${PORT:-8765}"
 exec .venv/bin/python -m uvicorn campuspulse.server:app --host 127.0.0.1 --port "${PORT:-8765}"

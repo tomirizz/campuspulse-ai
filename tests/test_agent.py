@@ -29,14 +29,15 @@ async def test_gemini_loop_real_mcp_with_scripted_model():
     models = FakeModels([
         response([types.Part(function_call=types.FunctionCall(id="c1", name="current_time", args={"timezone_name": "Asia/Almaty"}), thought_signature=b"test-signature")]),
         response([types.Part(function_call=types.FunctionCall(id="c2", name="list_tasks", args={}))]),
-        response([types.Part(text="private thought", thought=True), types.Part(text="У вас пока нет заданий.")]),
+        response([types.Part(text="private thought", thought=True), types.Part(text='{"fact_ids":["S2-2"],"explanation":"observed"}')]),
     ])
     client = SimpleNamespace(aio=SimpleNamespace(models=models))
     r = await gemini_run("Дедлайны?", {"tasks": []}, client=client)
-    assert r["answer"] == "У вас пока нет заданий."
+    assert "Сохранённых заданий пока нет" in r["answer"]
+    assert r["grounded"] and "private thought" not in r["answer"]
     assert [t["tool"] for t in r["trace"]] == ["current_time", "list_tasks"]
-    assert models.calls[1]["contents"][-1].parts[0].function_response.id == "c1"
-    assert models.calls[1]["contents"][-2].parts[0].thought_signature == b"test-signature"
+    assert models.calls[1]["contents"][-2].parts[0].function_response.id == "c1"
+    assert models.calls[1]["contents"][-3].parts[0].thought_signature == b"test-signature"
 
 
 async def test_tools_reject_unknown_and_invalid_and_cannot_access_arbitrary_files():
@@ -49,7 +50,7 @@ async def test_tools_reject_unknown_and_invalid_and_cannot_access_arbitrary_file
 async def test_task_proposal_requires_confirmation():
     async with ToolHub({"tasks": []}) as hub:
         result = await hub.call("propose_task", {"title": "Lab", "course": "ML", "due_at": "2026-10-20T12:00:00+05:00", "estimated_minutes": 60})
-        assert result["saved"] is False and len(hub.proposals) == 1
+        assert "error" in result and hub.proposals == []
         assert hub.context["tasks"] == []
 
 

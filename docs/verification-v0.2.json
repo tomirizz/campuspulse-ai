@@ -1,0 +1,179 @@
+{
+  "version": "0.2.0",
+  "date": "2026-10-16",
+  "offline_tests": {
+    "passed": 55,
+    "live_excluded": 1
+  },
+  "local_model": {
+    "provider": "Ollama",
+    "runtime": "0.40.5",
+    "model": "qwen3:1.7b",
+    "api_key_required": false,
+    "synthetic_inputs": true,
+    "scenarios": [
+      {
+        "question": "Почему у меня столько опыта? Покажи XP и уровень.",
+        "passed": true,
+        "model": "qwen3:1.7b",
+        "tools": [
+          "current_time",
+          "study_progress"
+        ],
+        "answer": "Опыт отражает отмеченные вами завершения. Он рассчитывается по одному правилу и не является оценкой знаний.\n\nОпыт\n35\n\nУровень\n1",
+        "evidence": [
+          {
+            "id": "S2-2",
+            "tool": "study_progress",
+            "title": "Опыт",
+            "text": "35",
+            "why": {
+              "title": "Общий опыт",
+              "formula": "XP = сумма XP завершённых заданий",
+              "inputs": {
+                "example-done": 35
+              },
+              "result": 35,
+              "source": "Задания → completed, reward_snapshot; campuspulse/progress.py → progress",
+              "note": "Повторные отметки не суммируются. Баллы не измеряют успеваемость.",
+              "version": "progress-v1"
+            }
+          },
+          {
+            "id": "S2-3",
+            "tool": "study_progress",
+            "title": "Уровень",
+            "text": "1",
+            "why": {
+              "title": "Уровень",
+              "formula": "уровень = 1 + floor(XP / 100); прогресс = XP mod 100",
+              "inputs": {
+                "XP": 35
+              },
+              "result": 1,
+              "source": "Правило progress-v1: порог уровня 100 XP",
+              "note": "",
+              "version": "progress-v1"
+            }
+          }
+        ]
+      },
+      {
+        "question": "Составь план учебной недели.",
+        "passed": true,
+        "model": "qwen3:1.7b",
+        "tools": [
+          "current_time",
+          "plan_week"
+        ],
+        "answer": "Ближайшие сроки получают место в плане первыми. Длительность берётся из ваших оценок, а свободные часы — из настроек.\n\nПлан недели\nЗапланировано 60 мин. Учебных блоков: 1.",
+        "evidence": [
+          {
+            "id": "S2-2",
+            "tool": "plan_week",
+            "title": "План недели",
+            "text": "Запланировано 60 мин. Учебных блоков: 1.",
+            "why": {
+              "title": "Как рассчитан план",
+              "formula": "запланированные минуты = сумма длительностей блоков",
+              "inputs": {
+                "блоки": [
+                  60
+                ],
+                "дневной лимит": 180,
+                "часовой пояс": "Asia/Almaty",
+                "учебное окно": [
+                  16,
+                  22
+                ],
+                "занятые интервалы": []
+              },
+              "result": 60,
+              "source": "campuspulse/planner.py → plan_week",
+              "note": "План рассчитывается кодом. Модель не изменяет минуты, порядок или формулу.",
+              "version": "progress-v1"
+            }
+          }
+        ]
+      },
+      {
+        "question": "Какой шаг обучения указан в загруженном материале gradient.txt?",
+        "passed": true,
+        "model": "qwen3:1.7b",
+        "tools": [
+          "current_time",
+          "list_materials",
+          "read_material"
+        ],
+        "answer": "Ниже приведены точные фрагменты загруженного текста. Сверьте их со страницей и строкой источника; новых утверждений к цитате не добавлено.\n\n[Пример] gradient.txt · стр. 1 · строка 2\nШаг обучения в этом учебном примере равен 0.01.",
+        "evidence": [
+          {
+            "id": "S3-4",
+            "tool": "read_material",
+            "title": "[Пример] gradient.txt · стр. 1 · строка 2",
+            "text": "Шаг обучения в этом учебном примере равен 0.01.",
+            "why": {
+              "title": "Точная цитата",
+              "formula": "фрагмент извлечённого текста без перефразирования",
+              "inputs": {
+                "страница": 1,
+                "строка": 2,
+                "символы": [
+                  1,
+                  47
+                ]
+              },
+              "result": "Шаг обучения в этом учебном примере равен 0.01.",
+              "source": "[Пример] gradient.txt",
+              "note": "Нумерация строк относится к извлечённому тексту; оригинальная вёрстка PDF может отличаться.",
+              "version": "progress-v1"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "github": {
+    "real_mcp": true,
+    "tools": [
+      "current_time",
+      "github_issues"
+    ],
+    "sources": [
+      "https://github.com/googleapis/python-genai/issues/3153",
+      "https://github.com/googleapis/python-genai/issues/3152",
+      "https://github.com/googleapis/python-genai/issues/3151",
+      "https://github.com/googleapis/python-genai/issues/3150",
+      "https://github.com/googleapis/python-genai/issues/3003",
+      "https://github.com/googleapis/python-genai/issues/3122",
+      "https://github.com/googleapis/python-genai/issues/3120",
+      "https://github.com/googleapis/python-genai/issues/3051"
+    ]
+  },
+  "browser": {
+    "mobile_css_width": 390,
+    "mobile_body_width": 390,
+    "desktop_css_width": 1066,
+    "console_errors": [],
+    "verified": [
+      "completion reward",
+      "achievement condition",
+      "reward formula dialog",
+      "focus start pause reset",
+      "real local chat response",
+      "persisted chat evidence"
+    ]
+  },
+  "launcher": {
+    "existing_model_reused": true,
+    "port": 8766,
+    "mode": "local",
+    "live_response_verified": true
+  },
+  "presentation": "unchanged old v0.1; new presentation deferred by owner",
+  "cloud": {
+    "gemini_live": false,
+    "agent_engine_deployed": false,
+    "reason": "Deferred by owner"
+  }
+}

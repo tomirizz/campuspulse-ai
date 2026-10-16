@@ -16,9 +16,10 @@ const state = {
   sending: false,
 };
 const names = {
-  overview: "Обзор",
+  overview: "Мой пульс",
+  journey: "Мой путь",
   chat: "AI-ассистент",
-  tasks: "Задания",
+  tasks: "Миссии",
   week: "Моя неделя",
   materials: "Материалы",
   settings: "Подключения и данные",
@@ -213,6 +214,7 @@ async function refresh() {
   renderMaterials();
   renderPreferences();
   renderHealth();
+  renderProgress();
 }
 function deadline(task) {
   const hours = (new Date(task.due_at) - new Date()) / 36e5;
@@ -237,13 +239,20 @@ function taskRow(task, full = false) {
     task.completed ? "✓" : "",
     async () => {
       try {
+        check.disabled = true;
+        const before = state.progress?.xp || 0;
         await api("/tasks/" + task.id, {
           method: "PATCH",
           body: JSON.stringify({ completed: !task.completed }),
         });
         await refresh();
+        if (state.progress.xp > before) celebrate(state.progress.xp - before);
+        else if (task.completed)
+          toast("Задание возвращено в работу. Его опыт исключён из суммы.");
       } catch (e) {
         toast(e.message, true);
+      } finally {
+        check.disabled = false;
       }
     },
     "task-box" + (task.completed ? " done" : ""),
@@ -261,7 +270,16 @@ function taskRow(task, full = false) {
       `${task.course} · ${task.estimated_minutes} мин${task.priority === "high" ? " · высокий приоритет" : ""}`,
     ),
   );
-  row.append(check, content, deadline(task));
+  const rewardBox = button(
+    "✦ " + task.why.result + " XP",
+    () => showWhy(task.why),
+    "reward-pill",
+  );
+  rewardBox.setAttribute(
+    "aria-label",
+    "Почему награда за «" + task.title + "»: " + task.why.result + " XP",
+  );
+  row.append(check, content, rewardBox, deadline(task));
   if (full) {
     const actions = el("div", "row-actions");
     actions.append(
@@ -292,35 +310,18 @@ function taskRow(task, full = false) {
 }
 function renderOverview() {
   const open = state.tasks.filter((t) => !t.completed);
-  const soon = open.filter(
-    (t) =>
-      new Date(t.due_at) > new Date() &&
-      (new Date(t.due_at) - new Date()) / 36e5 <= 48,
-  );
+  const m = state.metrics;
   $("#stat-open").replaceChildren(
-    document.createTextNode(open.length),
-    el("span", "", plural(open.length, ["задание", "задания", "заданий"])),
+    document.createTextNode(m.open),
+    el("span", "", plural(m.open, ["миссия", "миссии", "миссий"])),
   );
   $("#stat-due").replaceChildren(
-    document.createTextNode(soon.length),
-    el("span", "", plural(soon.length, ["дедлайн", "дедлайна", "дедлайнов"])),
+    document.createTextNode(m.due),
+    el("span", "", plural(m.due, ["дедлайн", "дедлайна", "дедлайнов"])),
   );
   $("#stat-hours").replaceChildren(
-    document.createTextNode(
-      (open.reduce((n, t) => n + t.estimated_minutes, 0) / 60).toLocaleString(
-        "ru-RU",
-        { maximumFractionDigits: 1 },
-      ),
-    ),
-    el(
-      "span",
-      "",
-      plural(open.reduce((n, t) => n + t.estimated_minutes, 0) / 60, [
-        "час",
-        "часа",
-        "часов",
-      ]),
-    ),
+    document.createTextNode(m.hours.toLocaleString("ru-RU")),
+    el("span", "", plural(m.hours, ["час", "часа", "часов"])),
   );
   $("#nav-count").textContent = open.length;
   const overdue = open.filter((t) => new Date(t.due_at) < new Date()).length;
@@ -417,7 +418,7 @@ $("#task-form").addEventListener("submit", async (event) => {
     });
     $("#task-dialog").close();
     await refresh();
-    toast("Задание сохранено");
+    toast("Задание сохранено. Источник: данные вашей формы.");
     if (state.view === "week") await loadPlan();
   } catch (e) {
     toast(e.message, true);
@@ -484,8 +485,8 @@ $("#preferences-form").addEventListener("submit", async (event) => {
       }),
     });
     await loadPlan();
-    renderOverview();
-    toast("План обновлён");
+    await refresh();
+    toast("План обновлён по сохранённым настройкам доступности.");
   } catch (e) {
     toast(e.message, true);
   }
@@ -495,17 +496,18 @@ async function loadPlan() {
     const p = await api("/plan");
     $("#plan-summary").textContent =
       `${p.scheduled_minutes} минут запланировано · ${p.sessions.length} ${plural(p.sessions.length, ["учебный блок", "учебных блока", "учебных блоков"])} · ${p.timezone}`;
+    $("#plan-summary").append(whyButton(p.why));
     const risks = $("#plan-risks");
     risks.replaceChildren();
-    p.risks.forEach((r) =>
-      risks.append(
-        el(
-          "div",
-          "risk",
-          `${r.title}: ${r.reason}. Осталось распределить ${r.unscheduled_minutes} мин.`,
-        ),
-      ),
-    );
+    p.risks.forEach((r) => {
+      const box = el(
+        "div",
+        "risk",
+        `${r.title}: ${r.reason}. Осталось ${r.unscheduled_minutes} мин.`,
+      );
+      box.append(whyButton(r.why));
+      risks.append(box);
+    });
     const grid = $("#week-grid");
     grid.replaceChildren();
     const today = wallTime(new Date()).slice(0, 10);
@@ -533,6 +535,7 @@ async function loadPlan() {
           `${timeLabel(s.start)} — ${timeLabel(s.end)}`,
         );
         block.append(el("strong", "", s.title), el("small", "", s.course));
+        block.append(whyButton(s.why));
         col.append(block);
       });
       grid.append(col);
@@ -551,7 +554,7 @@ $("#material-upload").addEventListener("change", async (event) => {
   try {
     await api("/materials", { method: "POST", body: form });
     await refresh();
-    toast("Материал добавлен");
+    toast("Материал добавлен. Текст извлечён из выбранного файла.");
   } catch (e) {
     toast(e.message, true);
   } finally {
@@ -582,7 +585,14 @@ function renderMaterials() {
             const section = el("section");
             section.append(
               el("strong", "", `Страница ${p.page}`),
-              el("pre", "", p.text),
+              el(
+                "pre",
+                "",
+                p.text
+                  .split("\n")
+                  .map((line, i) => `${i + 1} │ ${line}`)
+                  .join("\n"),
+              ),
             );
             content.append(section);
           });
@@ -612,44 +622,40 @@ function renderMaterials() {
 }
 function renderHealth() {
   const h = state.health;
-  const live = h.mode === "gemini" || h.mode === "remote";
+  const local = h.mode === "local";
+  const title = local
+    ? h.local?.ready
+      ? "Локальный ИИ · без ключа"
+      : "Локальный ИИ ожидает запуска"
+    : h.mode === "tools"
+      ? "Инструменты · без ИИ"
+      : "Gemini · облачный режим";
   const banner = $("#mode-banner");
-  $("strong", banner).textContent = live
-    ? h.mode === "remote"
-      ? "Режим Agent Engine"
-      : "Режим Gemini"
-    : "Режим инструментов";
-  $(":scope > div > span", banner).textContent = live
-    ? "Подключение проверяется при отправке запроса."
-    : "Планирование и MCP доступны. Gemini ещё не подключён.";
-  $("#chat-mode").textContent = live
-    ? "Агент выбирает инструменты; каждый вызов виден в журнале."
-    : "Режим без ИИ: выполняются только готовые команды и реальные инструменты.";
+  $("strong", banner).textContent = title;
+  $(":scope > div > span", banner).textContent = local
+    ? h.local?.ready
+      ? "Модель на этом компьютере. Числа и источники проверяет код."
+      : h.local?.reason
+    : "Все расчёты выполняет код, у ответов есть источники.";
+  $("#chat-mode").textContent =
+    title + ". Ассистент выбирает инструменты и проверяемые факты.";
   const cards = $("#integration-cards");
   cards.replaceChildren();
   [
     [
-      "Gemini",
-      live
-        ? `Выбрана модель ${h.model}. Успешность подтверждается ответом агента.`
-        : "Для свободного диалога нужен доступ к Gemini через Google Cloud.",
-      "gemini" === h.mode
-        ? "Настроен локальный вызов"
-        : "remote" === h.mode
-          ? "Через Agent Engine"
-          : "Не подключён",
+      "Локальный ИИ",
+      h.local?.reason || "Проверка при запуске",
+      h.local?.ready ? h.local.model : "Запустите файл с локальным ИИ",
     ],
     [
-      "MCP tools",
-      "Отдельный MCP-сервер: текущее время и публичные GitHub issues.",
-      "Готов к вызову",
+      "MCP и формулы",
+      "Время и GitHub через отдельный сервер. План и опыт — по фиксированным правилам.",
+      "Данные проверяются при вызове",
     ],
     [
-      "Google Cloud",
-      h.cloud_configured
-        ? "Задан адрес Agent Engine. Первый запрос проверит доступ."
-        : "Развёртывание требует входа в Google Cloud и проекта с биллингом.",
-      h.cloud_configured ? "Адрес настроен" : "Ещё не развёрнут",
+      "Google Cloud / Gemini",
+      "Сохранён для критериев хакатона. Развёртывание отложено; локальная модель его не заменяет.",
+      "Ожидает облачного запуска",
     ],
   ].forEach(([title, desc, status]) => {
     const card = el("article", "integration-card");
@@ -675,7 +681,7 @@ function appendSafeText(parent, text) {
   }
   parent.append(document.createTextNode(text.slice(last)));
 }
-function addMessage(role, text, proposals = []) {
+function addMessage(role, text, proposals = [], evidence = [], why = null) {
   const area = $("#messages");
   $(".chat-welcome", area)?.remove();
   const message = el("article", "message " + role);
@@ -687,6 +693,27 @@ function addMessage(role, text, proposals = []) {
   const body = el("div", "message-body");
   appendSafeText(body, text);
   message.append(meta, body);
+  if (role !== "user") {
+    message.append(
+      whyButton(
+        why || {
+          title: "Почему это сообщение",
+          source: "Проверка подключения и доступных источников",
+          result: text,
+        },
+      ),
+    );
+    if (evidence.length) {
+      const sources = el("div", "answer-sources");
+      sources.append(el("small", "", "ПРОВЕРИТЬ ИСТОЧНИКИ"));
+      evidence.forEach((f) =>
+        sources.append(
+          button(f.title + " ↗", () => showWhy(f.why), "source-chip"),
+        ),
+      );
+      message.append(sources);
+    }
+  }
   proposals.forEach((p) => {
     const box = el("div", "proposal");
     box.append(
@@ -709,7 +736,13 @@ function renderHistory() {
   area.replaceChildren();
   if (state.history.length) {
     state.history.forEach((m) =>
-      addMessage(m.role === "user" ? "user" : "assistant", m.text),
+      addMessage(
+        m.role === "user" ? "user" : "assistant",
+        m.text,
+        [],
+        m.evidence || [],
+        m.why,
+      ),
     );
     return;
   }
@@ -756,6 +789,7 @@ function renderTrace(trace) {
     step.append(
       el("strong", "", t.label),
       el("small", "", `${t.transport} · ${t.elapsed_ms} мс`),
+      el("small", "", t.selection || "Выбор модели"),
     );
     const details = el("details");
     details.append(
@@ -792,12 +826,18 @@ $("#chat-form").addEventListener("submit", async (event) => {
       body: JSON.stringify({ message }),
     });
     busy.remove();
-    addMessage("assistant", result.answer, result.proposals || []);
+    addMessage(
+      "assistant",
+      result.answer,
+      result.proposals || [],
+      result.evidence || [],
+      result.why,
+    );
     renderTrace(result.trace);
     $("#chat-mode").textContent =
       result.mode === "tools"
         ? "Команда выполнена без ИИ · реальные инструменты"
-        : `Ответ получен · ${result.model} · ${result.mode === "remote" ? "Google Cloud Agent Engine" : "Gemini"}`;
+        : `Ответ получен · ${result.model} · ${result.mode === "remote" ? "Google Cloud Agent Engine" : result.mode === "local" ? "локально, без ключа" : "Gemini"}`;
   } catch (e) {
     busy.remove();
     addMessage("error", e.message);
@@ -863,7 +903,16 @@ $("#github-form").addEventListener("submit", async (e) => {
       a.href = i.url;
       a.target = "_blank";
       a.rel = "noopener noreferrer";
-      out.append(a);
+      out.append(
+        a,
+        whyButton({
+          title: "Источник GitHub",
+          source: i.url,
+          formula: "Поля number и title из свежего ответа GitHub API",
+          inputs: { получено: result.fetched_at },
+          result: i.title,
+        }),
+      );
     });
   } catch (e) {
     $("#github-result").textContent = e.message;
@@ -923,6 +972,7 @@ $("#clear-data").onclick = async () => {
   }
 };
 async function start() {
+  initGame();
   try {
     state.health = await api("/health");
     await refresh();

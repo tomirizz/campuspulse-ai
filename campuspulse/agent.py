@@ -10,6 +10,7 @@ from google import genai
 from google.genai import types
 
 from campuspulse.tools import ToolHub
+from campuspulse.evidence import grounded_answer, evidence_prompt, facts_from_trace
 
 SYSTEM_PROMPT = """Ты CampusPulse AI, учебный помощник. Отвечай на языке пользователя.
 Помогай организовать учебную неделю, дедлайны, материалы и GitHub-задания.
@@ -24,13 +25,20 @@ propose_task с последующим подтверждением в инте�
 Отличай сроки от оценок. Не обещай выполнить учебную работу за студента.
 Сообщай о нехватке времени и просрочках; не скрывай риски плана.
 Не выводи скрытые размышления. Пользователь видит отдельный фактический журнал вызовов.
-Дай краткий полезный итог и следующий шаг. Если нет заданий, предложи добавить первое.
+СТРОГИЙ РЕЖИМ ДОКАЗАТЕЛЬСТВ: не вычисляй числа, не генерируй код или формулы.
+Для опыта, уровней и серии вызови study_progress. Все вычисления делает код инструментов.
+Не используй propose_task: пользователь вводит параметры в форме сам.
+Для ответа по материалу прочитай материал; найди точную строку, содержащую ответ.
+Твой финальный ответ — только JSON: {"fact_ids": ["ID существующего факта"], "explanation": "код"}.
+Коды: observed, deadline_first, limited_time, reward_rule, source_quote, action_needed, missing_source.
+Для unknown вопросов используй пустой список и missing_source. Для вопроса о планировании — plan_week.
+Не выводи свободный текст ответа: сервер подставит факты и фиксированное объяснение по выбранным ID.
 """
 
 LABELS = {"current_time": "Проверяю дату и часовой пояс", "github_issues": "Проверяю открытые GitHub issues",
           "list_tasks": "Проверяю задания и дедлайны", "plan_week": "Распределяю учебную нагрузку",
           "list_materials": "Нахожу загруженные материалы", "read_material": "Читаю страницы материала",
-          "propose_task": "Готовлю задание для подтверждения"}
+          "study_progress": "Считаю прогресс по правилам", "propose_task": "Готовлю задание для подтверждения"}
 
 
 def configured_client(project=None, location=None):
@@ -46,7 +54,7 @@ def configured_client(project=None, location=None):
 
 async def execute_with_trace(hub, name, arguments, trace):
     begin = time.monotonic()
-    result = await hub.call(name, arguments)
+    result = {"error": "Ассистент не задаёт значения задания. Заполните форму самостоятельно."} if name == "propose_task" else await hub.call(name, arguments)
     trace.append({"step": len(trace) + 1, "label": LABELS.get(name, "Проверяю инструмент"),
                   "tool": name, "transport": "MCP · stdio" if name in hub.mcp_names else "Function Calling",
                   "arguments": arguments, "status": "error" if "error" in result else "ok",
@@ -69,7 +77,7 @@ async def gemini_run(message, context, history=None, *, client=None, model=None,
     try:
         async with hub_factory(context) as hub:
             declarations = [types.FunctionDeclaration(name=t["name"], description=t["description"],
-                            parameters_json_schema=t["parameters"]) for t in hub.specs.values()]
+                            parameters_json_schema=t["parameters"]) for t in hub.specs.values() if t["name"] != "propose_task"]
             config = types.GenerateContentConfig(system_instruction=SYSTEM_PROMPT,
                          tools=[types.Tool(function_declarations=declarations)],
                          automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
@@ -99,7 +107,8 @@ async def gemini_run(message, context, history=None, *, client=None, model=None,
                     parts.append(types.Part(function_response=types.FunctionResponse(
                         id=call.id, name=call.name, response=result)))
                 contents.append(types.Content(role="user", parts=parts))
-            return {"answer": answer, "trace": trace, "mode": "gemini", "model": model,
+                contents.append(types.Content(role="user", parts=[types.Part.from_text(text=evidence_prompt(trace))]))
+            return {**grounded_answer(answer, trace), "trace": trace, "mode": "gemini", "model": model,
                     "status": status, "proposals": hub.proposals, "plan": hub.last_plan}
     finally:
         if owned:
@@ -124,6 +133,9 @@ async def tools_only_run(message, context):
                 answer = f"GitHub: {result['repository']}\n" + ("\n".join(
                     f"• #{i['number']} — {i['title']}\n{i['url']}" for i in result["issues"][:8]) or "Открытых issues в полученной выборке нет.")
                 answer += f"\n\nПолучено: {result['fetched_at']}\n{result['coverage']}"
+        elif any(w in lower for w in ("опыт", "уровень", "балл", "xp", "прогресс")):
+            result = await call("study_progress")
+            answer = f"Опыт: {result['xp']} XP. Уровень: {result['level']}. Серия: {result['streak']} дней."
         elif any(w in lower for w in ("материал", "конспект", "pdf", "лекци")):
             result = await call("list_materials")
             answer = "Загрузите PDF или TXT во вкладке «Материалы»."
@@ -131,7 +143,7 @@ async def tools_only_run(message, context):
                 material = result["materials"][-1]
                 data = await call("read_material", {"material_id": material["id"], "page": 1})
                 answer = f"Фрагмент: {data['source']}\n" + "\n".join(f"Стр. {p['page']}: {p['text'][:900]}" for p in data["pages"])
-                answer += "\n\nАнализ и ответы по содержанию доступны после подключения Gemini."
+                answer += "\n\nАнализ и ответы по содержанию доступны в локальном режиме ИИ или Gemini."
         elif any(w in lower for w in ("план", "недел", "week")):
             await call("list_tasks")
             result = await call("plan_week")
@@ -147,8 +159,13 @@ async def tools_only_run(message, context):
             items = sorted([t for t in result["tasks"] if not t["completed"]], key=lambda t: t["due_at"])
             answer = "\n".join(f"• {t['title']} · {t['course']}\n  Срок: {t['due_at']} · {t['estimated_minutes']} мин" for t in items) or "Открытых заданий нет. Добавьте первое во вкладке «Задания»."
         else:
-            answer = "Сейчас работает режим инструментов без ИИ. Я могу показать дедлайны, построить план недели, прочитать загруженный материал или проверить GitHub owner/repo. Для свободного диалога подключите Gemini."
-        return {"answer": answer, "trace": trace, "mode": "tools", "model": None,
+            answer = "Сейчас работает режим инструментов без ИИ. Я могу показать дедлайны, построить план недели, прочитать загруженный материал или проверить GitHub owner/repo. Локальный ИИ запускается без ключа через отдельный файл запуска."
+        for step in trace:
+            step["selection"] = "Правило команды без ИИ"
+        facts = facts_from_trace(trace)
+        relevant = [f for f in facts if f["title"] != "Время проверки"][:8]
+        verified = grounded_answer("", trace, explicit_choice={"fact_ids": [f["id"] for f in relevant], "explanation": "observed" if relevant else "missing_source"})
+        return {**verified, "answer": answer, "trace": trace, "mode": "tools", "model": None,
                 "status": "ok", "proposals": [], "plan": hub.last_plan}
 
 

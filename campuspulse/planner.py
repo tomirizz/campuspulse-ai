@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from campuspulse.models import Preferences
+from campuspulse.progress import proof
 
 
 def plan_week(tasks: list[dict], preferences: dict | None = None,
@@ -62,7 +63,21 @@ def plan_week(tasks: list[dict], preferences: dict | None = None,
             risks.append({"task_id": task["id"], "title": task["title"],
                           "reason": "Не хватает свободного времени до дедлайна в горизонте плана",
                           "unscheduled_minutes": remaining})
+    for session in sessions:
+        session["why"] = proof("Почему этот блок", "минуты = (конец − начало) / 60 секунд; ближайший дедлайн первым",
+            {"task_id": session["task_id"], "start": session["start"], "end": session["end"], "daily_limit": prefs.daily_minutes}, session["minutes"],
+            "Ваши задания + настройки времени → campuspulse/planner.py → plan_week", "Шаг сетки 15 минут, длина блока до 60 минут; занятые интервалы исключены.")
+    for risk in risks:
+        task = next(t for t in tasks if t["id"] == risk["task_id"])
+        allocated = sum(s["minutes"] for s in sessions if s["task_id"] == task["id"])
+        risk["why"] = proof("Почему не помещается", "остаток = оценка минут − запланированные минуты",
+            {"оценка": task["estimated_minutes"], "запланировано": allocated, "дедлайн": task["due_at"], "сейчас": now.isoformat()},
+            risk["unscheduled_minutes"], "Ваше задание + свободные интервалы", "Жадный алгоритм по ближайшему дедлайну; это не доказательство глобально оптимального расписания.")
     return {"sessions": sorted(sessions, key=lambda s: s["start"]), "risks": risks,
+            "why": proof("Как рассчитан план", "запланированные минуты = сумма длительностей блоков",
+                         {"блоки": [s["minutes"] for s in sessions], "дневной лимит": prefs.daily_minutes, "часовой пояс": prefs.timezone,
+                          "учебное окно": [prefs.start_hour, prefs.end_hour], "занятые интервалы": [b.model_dump(mode="json") for b in prefs.busy]},
+                         sum(s["minutes"] for s in sessions), "campuspulse/planner.py → plan_week", "План рассчитывается кодом. Модель не изменяет минуты, порядок или формулу."),
             "scheduled_minutes": sum(s["minutes"] for s in sessions),
             "timezone": prefs.timezone, "generated_at": now.isoformat(),
             "policy": "Сначала ближайший дедлайн; при равенстве — высокий приоритет. Блоки до 60 минут."}

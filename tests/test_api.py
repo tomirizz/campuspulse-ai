@@ -109,3 +109,33 @@ def test_gemini_missing_credentials_never_falls_back(client, monkeypatch):
     r = client.post("/api/chat", json={"message": "План недели"})
     assert r.status_code == 503
     assert not client.get("/api/workspace").json()["history"]
+
+
+def test_reward_api_idempotent_and_edit_frozen(client):
+    t=client.post('/api/tasks',json=data(estimated_minutes=90)).json()
+    path='/api/tasks/'+t['id']
+    for _ in range(3):client.patch(path,json={'completed':True})
+    w=client.get('/api/workspace').json()
+    assert w['progress']['xp']==35 and len(w['progress']['ledger'])==1
+    client.put(path,json=data(estimated_minutes=2400))
+    assert client.get('/api/workspace').json()['progress']['xp']==35
+    client.patch(path,json={'completed':False})
+    assert client.get('/api/workspace').json()['progress']['xp']==0
+    client.patch(path,json={'completed':True})
+    assert client.get('/api/workspace').json()['progress']['xp']==35
+    client.delete(path)
+    assert client.get('/api/workspace').json()['progress']['xp']==0
+
+
+def test_explanations_accompany_results_and_errors(client):
+    task=client.post('/api/tasks',json=data()).json()
+    assert task['why']['inputs']['оценка минут']==90
+    plan=client.get('/api/plan').json()
+    assert plan['why']['result']==90
+    assert all('why' in s for s in plan['sessions'])
+    error=client.post('/api/tasks',json=data(estimated_minutes=-1))
+    assert error.status_code==422 and error.json()['why']['source']
+    r=client.post('/api/chat',json={'message':'Составь план недели'}).json()
+    assert r['why']['source'] and r['evidence']
+    h=client.get('/api/workspace').json()['history'][-1]
+    assert h['evidence']==r['evidence'] and h['why']==r['why']

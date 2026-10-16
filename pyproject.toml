@@ -1,6 +1,6 @@
 [project]
 name = "campuspulse-ai"
-version = "0.1.0"
+version = "0.2.0"
 description = "CampusPulse AI — GDG Astana student agent with Gemini, MCP and Vertex AI Agent Engine"
 requires-python = ">=3.11,<3.14"
 dependencies = [

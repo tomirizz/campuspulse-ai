@@ -32,6 +32,16 @@ class SQLiteStore:
         with self.connect() as db:
             return bool(db.execute("DELETE FROM records WHERE sid=? AND kind=? AND id=?", (sid, kind, key)).rowcount)
 
+    def update(self, sid, kind, key, transform):
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute("SELECT body FROM records WHERE sid=? AND kind=? AND id=?", (sid, kind, key)).fetchone()
+            if not row:
+                return None
+            body = transform(json.loads(row[0]))
+            db.execute("UPDATE records SET body=? WHERE sid=? AND kind=? AND id=?", (json.dumps(body, ensure_ascii=False), sid, kind, key))
+            return body
+
     def clear(self, sid):
         with self.connect() as db:
             db.execute("DELETE FROM records WHERE sid=?", (sid,))
@@ -59,6 +69,19 @@ class FirestoreStore:
         existed = doc.get().exists
         doc.delete()
         return existed
+
+    def update(self, sid, kind, key, transform):
+        from google.cloud import firestore
+        ref = self.collection(sid, kind).document(key)
+        @firestore.transactional
+        def change(transaction):
+            snapshot = ref.get(transaction=transaction)
+            if not snapshot.exists:
+                return None
+            body = transform(snapshot.to_dict())
+            transaction.set(ref, body)
+            return body
+        return change(self.client.transaction())
 
     def clear(self, sid):
         for kind in ("tasks", "materials", "meta"):

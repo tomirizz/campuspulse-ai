@@ -19,10 +19,13 @@ from campuspulse.models import ChatInput, GitHubInput, Preferences, TaskInput, T
 from campuspulse.planner import calendar_export, plan_week
 from campuspulse.storage import make_store
 from campuspulse.tools import ToolHub
+from campuspulse.local_agent import local_run, local_status
+from campuspulse.progress import progress, metrics, task_proof, complete_task, proof
+from fastapi.exceptions import RequestValidationError
 
 load_dotenv()
 ROOT = Path(__file__).resolve().parent.parent
-app = FastAPI(title="CampusPulse AI", version="0.1.0", docs_url="/api/docs")
+app = FastAPI(title="CampusPulse AI", version="0.2.0", docs_url="/api/docs")
 store = make_store()
 chat_slots = asyncio.Semaphore(4)
 active_sessions: set[str] = set()
@@ -58,10 +61,11 @@ def workspace(sid):
 
 
 @app.get("/api/health")
-def health():
-    mode = os.getenv("AGENT_MODE", "tools")
-    return {"ok": True, "version": "0.1.0", "mode": mode,
-            "model": os.getenv("GEMINI_MODEL", "gemini-3.6-flash") if mode != "tools" else None,
+async def health():
+    mode = os.getenv("AGENT_MODE", "local")
+    return {"ok": True, "version": "0.2.0", "mode": mode,
+            "local": await local_status(),
+            "model": os.getenv("LOCAL_MODEL", "qwen3:1.7b") if mode == "local" else os.getenv("GEMINI_MODEL", "gemini-3.6-flash") if mode != "tools" else None,
             "storage": os.getenv("STORAGE_BACKEND", "sqlite"),
             "cloud_configured": bool(os.getenv("ENGINE_RESOURCE_NAME")),
             "cloud_verified": False,
@@ -73,6 +77,13 @@ def get_workspace(request: Request):
     data = workspace(request.state.sid)
     data["materials"] = [{k: m[k] for k in ("id", "name", "page_count", "uploaded_at")} for m in data["materials"]]
     data["history"] = (store.get(request.state.sid, "meta", "history") or {}).get("turns", [])
+    for turn in data["history"]:
+        if turn.get("role") == "model" and not turn.get("why"):
+            turn["text"] = "Сохранён ответ предыдущей версии без карточек источников. Задайте вопрос ещё раз для проверяемого ответа."
+            turn["why"] = {"title": "Почему старый ответ скрыт", "source": "История v0.1", "result": "В записи нет источников нового формата. Система не выдаёт её за проверенный ответ."}
+    data["progress"] = progress(data["tasks"], data["preferences"])
+    data["metrics"] = metrics(data["tasks"])
+    data["tasks"] = [{**t, "why": task_proof(t)} for t in data["tasks"]]
     return data
 
 
@@ -84,27 +95,23 @@ def add_task(body: TaskInput, request: Request):
     task = {**body.model_dump(mode="json"), "id": uuid.uuid4().hex, "completed": False,
             "created_at": datetime.now(timezone.utc).isoformat()}
     store.put(sid, "tasks", task["id"], task)
-    return task
+    return {**task, "why": task_proof(task)}
 
 
 @app.patch("/api/tasks/{task_id}")
 def patch_task(task_id: str, body: TaskPatch, request: Request):
-    task = store.get(request.state.sid, "tasks", task_id)
+    task = store.update(request.state.sid, "tasks", task_id, lambda t: complete_task(t, body.completed))
     if not task:
         raise HTTPException(404, "Задание не найдено")
-    task["completed"] = body.completed
-    store.put(request.state.sid, "tasks", task_id, task)
-    return task
+    return {**task, "why": task_proof(task)}
 
 
 @app.put("/api/tasks/{task_id}")
 def edit_task(task_id: str, body: TaskInput, request: Request):
-    task = store.get(request.state.sid, "tasks", task_id)
+    task = store.update(request.state.sid, "tasks", task_id, lambda t: {**t, **body.model_dump(mode="json")})
     if not task:
         raise HTTPException(404, "Задание не найдено")
-    task.update(body.model_dump(mode="json"))
-    store.put(request.state.sid, "tasks", task_id, task)
-    return task
+    return {**task, "why": task_proof(task)}
 
 
 @app.delete("/api/tasks/{task_id}", status_code=204)
@@ -221,16 +228,19 @@ async def chat(body: ChatInput, request: Request):
         async with chat_slots, asyncio.timeout(175):
             context = workspace(sid)
             history = (store.get(sid, "meta", "history") or {}).get("turns", [])
-            mode = os.getenv("AGENT_MODE", "tools")
+            mode = os.getenv("AGENT_MODE", "local")
             if mode == "remote":
                 result = await asyncio.to_thread(remote_run, body.message, context, history)
             elif mode == "gemini":
                 result = await gemini_run(body.message, context, history)
             elif mode == "tools":
                 result = await tools_only_run(body.message, context)
+            elif mode == "local":
+                result = await local_run(body.message, context, history)
             else:
                 raise ValueError("Неизвестный режим AGENT_MODE")
-            history += [{"role": "user", "text": body.message}, {"role": "model", "text": result["answer"]}]
+            history += [{"role": "user", "text": body.message}, {"role": "model", "text": result["answer"],
+                         "why": result.get("why"), "evidence": result.get("evidence", []), "mode": result["mode"], "model": result.get("model")}]
             store.put(sid, "meta", "history", {"turns": history[-12:]})
             result["run_id"] = uuid.uuid4().hex
             return result
@@ -240,7 +250,7 @@ async def chat(body: ChatInput, request: Request):
         raise HTTPException(503, str(exc)) from exc
     except Exception as exc:
         # Never leak upstream exceptions, tokens, or uploaded text to server logs.
-        raise HTTPException(503, "Агент недоступен. Проверьте доступ к Gemini/GCP и выбранную модель; ответ не был сгенерирован") from exc
+        raise HTTPException(503, "Агент недоступен. Проверьте выбранную модель и подключение; ответ не был сгенерирован") from exc
     finally:
         active_sessions.discard(sid)
 
@@ -259,6 +269,17 @@ def clear_workspace(request: Request):
 
 
 app.mount("/assets", StaticFiles(directory=ROOT / "web"), name="assets")
+
+
+@app.exception_handler(HTTPException)
+async def explain_http_error(request, exc):
+    return JSONResponse({"detail": exc.detail, "why": {"title": "Почему запрос не выполнен", "source": "Проверка запроса сервером", "result": exc.detail}}, status_code=exc.status_code)
+
+
+@app.exception_handler(RequestValidationError)
+async def explain_validation(request, exc):
+    fields = [".".join(str(x) for x in e["loc"]) for e in exc.errors()]
+    return JSONResponse({"detail": "Проверьте поля: " + ", ".join(fields), "why": {"title": "Почему данные не приняты", "source": "Правила формы → campuspulse/models.py", "result": fields}}, status_code=422)
 
 
 @app.get("/")
