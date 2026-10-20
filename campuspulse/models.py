@@ -50,8 +50,8 @@ class BusyBlock(BaseModel):
 class Preferences(BaseModel):
     model_config = ConfigDict(extra="forbid")
     timezone: str = "Asia/Almaty"
-    daily_minutes: int = Field(default=180, ge=30, le=480)
-    start_hour: int = Field(default=16, ge=0, le=22)
+    daily_minutes: int = Field(default=180, ge=15, le=600)
+    start_hour: int = Field(default=16, ge=0, le=23)
     end_hour: int = Field(default=22, ge=1, le=24)
     busy: list[BusyBlock] = Field(default_factory=list, max_length=5000)
     event_minutes: int = Field(default=60, ge=5, le=1440)

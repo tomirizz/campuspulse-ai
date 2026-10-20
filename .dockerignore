@@ -11,3 +11,13 @@ docs
 tests
 *.zip
 *.pptx
+.presentation-build
+.codex-finalizer
+tmp
+dist
+credentials*.json
+*client_secret*.json
+*service-account*.json
+*service_account*.json
+*.key
+*.pem

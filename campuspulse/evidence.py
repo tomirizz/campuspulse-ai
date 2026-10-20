@@ -1,5 +1,6 @@
 """The model may select evidence, but cannot write the facts displayed as an answer."""
 import json
+import re
 from campuspulse.progress import proof, task_proof
 
 EXPLANATIONS = {
@@ -25,6 +26,34 @@ def facts_from_trace(trace):
             facts.append({"id": f"S{step['step']}-{len(facts) + 1}", "tool": name, "title": title, "text": str(text), "why": why})
         if "error" in r:
             add("Источник недоступен", r["error"], proof("Ошибка инструмента", "данные не получены", step["arguments"], r["error"], name))
+        elif name == "academic_overview":
+            if not r["courses"]:
+                add("Мои предметы", "Добавьте предмет в разделе «Мои предметы» или загрузите силлабус. Без подтверждённых весов расчёта не будет.", r["why"])
+            summary = r["summary"]
+            if summary.get("current_gpa") is not None:
+                add("Предварительный GPA", f"{summary['current_gpa']} по {summary['graded_courses']} предметам с оценками. {summary['gpa_note']}", r["why"])
+            for course in r["courses"][:12]:
+                current = f"{course['current_average']:g}%" if course["current_average"] is not None else "оценок ещё нет"
+                target = f"Рабочая цель: {course['active_target']:g}." if course["active_target"] is not None else "Ни одна из выбранных целей уже недостижима. Обсудите пересдачу с преподавателем."
+                text = f"Текущий средний: {current}; проверено {course['completed_weight']:g}% веса. Уже набрано {course['earned_points']:g} из 100 итоговых баллов. Максимум: {course['max_achievable']:g}. {target}\n" + "; ".join(course["priority_reasons"])
+                if course.get("balanced_plan"):
+                    text += "\nПлан по оставшимся работам: " + "; ".join(f"{c['name']}: {c['required_score']:g} из {c['max_score']:g}" for c in course["balanced_plan"])
+                add(course["name"], text, proof("Оценки и цель", course["formula"],
+                    {"компоненты": course["components"], "правила": course["evidence"]},
+                    {"максимум": course["max_achievable"], "цель": course["active_target"]}, "Подтверждённый силлабус и оценки пользователя", course["plan_note"]))
+        elif name == "academic_plan":
+            add("План подготовки", f"Запланировано {r['scheduled_minutes']} мин. Блоков: {len(r['sessions'])}. {r['policy']}", r["why"])
+            for session in r["sessions"][:8]:
+                add(session["course"], f"{session['title']}\n{session['start']} — {session['end']} ({session['minutes']} мин.)", r["why"])
+            for risk in r["risks"][:4]:
+                add("Риск в плане", risk.get("reason", str(risk)), r["why"])
+        elif name == "syllabus_weights":
+            course = r.get("course", {})
+            components = course.get("components", [])
+            text = "; ".join(f"{c['name']}: {c['weight']:g}%" for c in components) or "Полная схема оценивания не распознана. Вставьте текст формулы и таблицы либо заполните веса вручную."
+            if r.get("warnings"):
+                text += "\n" + "\n".join(r["warnings"])
+            add("Веса из силлабуса", text, proof("Разбор силлабуса", "внешний вес аттестации × внутренний вес работы", {}, components, "Загруженный пользователем документ", "Предложение требуется проверить и сохранить в разделе «Мои предметы»."))
         elif name == "search_materials":
             add("Поиск по материалам", f"Найдено фрагментов: {r['total_matches']}; показано: {len(r['matches'])}.", r["why"])
             for m in r["matches"]:
@@ -97,7 +126,13 @@ def grounded_answer(raw, trace, *, explicit_choice=None, allow_time=True):
     facts = facts_from_trace(trace)
     valid = {f["id"]: f for f in facts if allow_time or f["tool"] != "current_time"}
     try:
-        choice = explicit_choice if explicit_choice is not None else json.loads(raw.strip())
+        text = raw.strip() if explicit_choice is None else ""
+        # A Markdown wrapper is formatting, not evidence. Only unwrap a whole
+        # single JSON code block; prose, extra blocks and invented IDs still fail.
+        fenced = re.fullmatch(r"\x60{3}(?:json)?[ \t]*\r?\n([\s\S]*?)\r?\n\x60{3}", text, re.I)
+        if fenced:
+            text = fenced[1].strip()
+        choice = explicit_choice if explicit_choice is not None else json.loads(text)
         ids = choice["fact_ids"]
         key = choice["explanation"]
         if not isinstance(ids, list) or len(ids) > 8 or key not in EXPLANATIONS or any(not isinstance(i, str) or i not in valid for i in ids):

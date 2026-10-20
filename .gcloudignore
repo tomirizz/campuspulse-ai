@@ -8,3 +8,13 @@ __pycache__
 deployment.json
 evidence
 *.zip
+.presentation-build
+.codex-finalizer
+tmp
+dist
+credentials*.json
+*client_secret*.json
+*service-account*.json
+*service_account*.json
+*.key
+*.pem

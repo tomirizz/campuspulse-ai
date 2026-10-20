@@ -1,0 +1,100 @@
+/* The actual calendar is a document view, with source-aware event colours. */
+.campus-calendar { --cal-purple: #7453d5; --cal-local: #7952c2; --cal-google: #43896d; --cal-study: #6a84bb; --cal-deadline: #bd7754; --cal-imported: #9b85b4; background: #fff; border: 1px solid #e9e3f1; border-radius: 22px; margin-bottom: 30px; overflow: hidden; }
+.campus-calendar-heading { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 29px 29px 24px; background: linear-gradient(110deg, #fbf9ff, #fff); }
+.campus-calendar-heading h2 { font-size: 32px; letter-spacing: -1px; margin: 8px 0 6px; line-height: 1.15; }
+.campus-calendar-heading h2 span { color: var(--cal-purple); }
+.campus-calendar-heading p { margin: 0; color: #93859f; font-size: 12px; }
+.campus-calendar-actions, .campus-calendar-toolbar, .campus-month-navigation, .campus-calendar-connection { display: flex; align-items: center; gap: 11px; }
+.campus-calendar-actions .button { font-size: 11px; white-space: nowrap; }
+.campus-calendar-toolbar { justify-content: space-between; padding: 17px 25px; border-top: 1px solid #f1ecf7; border-bottom: 1px solid #f1ecf7; gap: 15px; flex-wrap: wrap; }
+.campus-month-navigation { gap: 6px; }
+.campus-month-navigation .icon-button { font-size: 24px; width: 30px; height: 30px; color: #8f7ba9; padding: 0; }
+.campus-month-navigation h3 { font-size: 16px; text-transform: capitalize; min-width: 158px; margin: 0; text-align: center; }
+.campus-calendar.is-week .campus-month-navigation h3 { text-transform: none; }
+.campus-month-navigation .text-button { font-size: 10px; margin-left: 10px; }
+.campus-calendar-connection { gap: 15px; font-size: 10px; color: #9c89b3; }
+.campus-calendar-connection .text-button { font-size: 10px; }
+.campus-calendar-modes { display: flex; align-items: center; padding: 3px; border: 1px solid #eee7f7; border-radius: 9px; gap: 2px; }
+.campus-calendar-mode { padding: 6px 12px; border-radius: 6px; font-size: 10px; color: #b09ac4; background: transparent; }
+.campus-calendar-mode.is-active { background: #f0e9fb; color: #8561b5; }
+#campus-calendar-connection.is-connected { color: #49866b; }
+.campus-calendar-message { margin: 0; font-size: 11px; color: #8b78a4; padding: 10px 25px; background: #faf7ff; }
+.campus-calendar-message:empty { display: none; }
+.campus-calendar-message.is-error { background: #fff2ec; color: #ad6047; }
+.campus-calendar-layout { display: grid; grid-template-columns: minmax(0, 1fr) 242px; }
+.campus-calendar-month { min-width: 0; }
+.campus-weekdays, .campus-calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.campus-weekdays { padding: 15px 5px 12px; font-size: 10px; color: #a99bb5; text-align: center; }
+.campus-weekdays span:nth-last-child(-n+2) { color: #bba9cd; }
+.campus-day { min-width: 0; min-height: 100px; padding: 5px 5px 7px; border-top: 1px solid #f1edf6; border-right: 1px solid #f1edf6; transition: background .16s ease; }
+.campus-day:nth-child(7n) { border-right: 0; }
+.campus-calendar.is-week .campus-day { min-height: 205px; padding-top: 10px; }
+.campus-calendar.is-week .campus-calendar-grid { min-height: 205px; }
+.campus-day.is-outside { background: #fcfbfd; }
+.campus-day.is-outside .campus-day-number { color: #ccc2d6; }
+.campus-day.is-selected { background: #f8f4ff; box-shadow: inset 0 0 0 1px #d6c5f0; }
+.campus-day-number { display: flex; justify-content: center; align-items: center; width: 25px; height: 25px; border-radius: 50%; color: #8e7d9f; font-size: 10px; margin-bottom: 3px; background: transparent; padding: 0; }
+.campus-day-number:hover { background: #efe7fa; }
+.campus-day.is-today .campus-day-number { color: #fff; background: var(--cal-purple); font-weight: 700; }
+.campus-calendar-event { display: block; width: 100%; font-size: 9px; padding: 3px 5px; line-height: 1.4; background: #f2ebfa; color: var(--cal-local); border-radius: 4px; margin-bottom: 3px; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-left: 2px solid currentColor; }
+.campus-calendar-event.kind-google { color: var(--cal-google); background: #eaf4ee; }
+.campus-calendar-event.kind-study { color: var(--cal-study); background: #edf1fa; }
+.campus-calendar-event.kind-deadline, .campus-calendar-event.is-important { color: var(--cal-deadline); background: #fdf0e9; }
+.campus-calendar-event.kind-imported { color: var(--cal-imported); background: #f1edf6; }
+.campus-calendar-event:hover { filter: brightness(.96); }
+.campus-calendar-more { padding: 0 4px; background: transparent; color: #9c88b1; font-size: 9px; }
+.campus-calendar-legend { padding: 16px 18px; display: flex; flex-wrap: wrap; gap: 11px; border-top: 1px solid #f1edf6; color: #a293af; font-size: 9px; }
+.campus-calendar-legend span::before { content: ""; display: inline-block; vertical-align: middle; width: 6px; height: 6px; border-radius: 50%; margin-right: 5px; background: var(--cal-local); }
+.campus-calendar-legend .kind-google::before { background: var(--cal-google); }
+.campus-calendar-legend .kind-study::before { background: var(--cal-study); }
+.campus-calendar-legend .kind-deadline::before { background: var(--cal-deadline); }
+.campus-calendar-legend .kind-imported::before { background: var(--cal-imported); }
+.campus-calendar-agenda { border-left: 1px solid #eee7f5; background: #fcfaff; padding: 25px 20px; }
+.campus-calendar-agenda .eyebrow { font-size: 8px; letter-spacing: 1.5px; color: #b09fc1; }
+.campus-calendar-agenda h3 { text-transform: capitalize; font-size: 16px; margin: 13px 0 8px; line-height: 1.4; }
+#campus-calendar-day-count { font-size: 10px; color: #b09bc3; margin-bottom: 25px; }
+.campus-agenda-event { display: flex; flex-direction: column; gap: 4px; width: 100%; text-align: left; border-left: 2px solid var(--cal-local); background: #fff; padding: 11px 12px; border-radius: 0 8px 8px 0; margin-bottom: 12px; box-shadow: 0 3px 15px #62408704; }
+.campus-agenda-event.kind-google { border-color: var(--cal-google); }
+.campus-agenda-event.kind-study { border-color: var(--cal-study); }
+.campus-agenda-event.kind-deadline { border-color: var(--cal-deadline); }
+.campus-agenda-event.kind-imported { border-color: var(--cal-imported); }
+.campus-agenda-event strong { font-size: 11px; font-weight: 600; color: #76638c; overflow-wrap: anywhere; }
+.campus-agenda-event small { font-size: 8px; color: #ad9cba; }
+.campus-agenda-more > summary { cursor: pointer; padding: 4px 0 12px; color: #a18ab4; font-size: 10px; }
+.campus-agenda-more .campus-agenda-event { margin-top: 8px; }
+.campus-agenda-time { font-size: 9px; color: #a487bf; }
+#campus-calendar-day-add { font-size: 10px; padding-left: 0; margin-top: 10px; }
+.campus-calendar-empty-mark { font-size: 35px; color: #d8cbed; text-align: center; margin-top: 45px; }
+.campus-calendar-empty { text-align: center; color: #b3a2c3; font-size: 11px; line-height: 1.8; padding: 0 10px; }
+.campus-calendar-demo { text-align: left; padding: 0; font-size: 10px; color: #9a7cb6; }
+.campus-calendar-information { border-top: 1px solid #f1edf6; }
+.campus-calendar-information > summary { font-size: 9px; color: #b19dbf; padding: 13px 22px; cursor: pointer; }
+.campus-calendar-information .campus-calendar-legend { border-top: 0; padding-top: 3px; }
+.campus-calendar-footer { padding: 15px 23px; display: flex; justify-content: space-between; align-items: center; gap: 12px; border-top: 1px solid #f1edf6; color: #ad9bbb; font-size: 9px; flex-wrap: wrap; }
+.campus-calendar-footer a { text-decoration: none; color: #9a80b1; }
+.campus-calendar-coverage { flex-basis: 100%; margin: 0; color: #ac9bb8; line-height: 1.6; }
+.campus-calendar-dialog { border: 1px solid #e9e1f2; border-radius: 22px; padding: 28px; width: min(620px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); overflow: auto; color: #564169; background: #fff; box-shadow: 0 25px 110px #35244826; }
+.campus-calendar-dialog::backdrop { background: #27173c55; backdrop-filter: blur(3px); }
+.campus-calendar-dialog-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 24px; }
+.campus-calendar-dialog-heading h2 { margin: 8px 0 0; font-size: 25px; letter-spacing: -.7px; line-height: 1.3; overflow-wrap: anywhere; }
+.campus-calendar-dialog-heading .eyebrow { font-size: 8px; color: #a28caf; }
+.campus-calendar-dialog-heading .icon-button { font-size: 24px; color: #a38bb5; padding: 0; width: 30px; height: 30px; flex: 0 0 30px; }
+.campus-calendar-dialog label { display: block; font-size: 11px; color: #927e9f; margin-bottom: 17px; }
+.campus-calendar-dialog input, .campus-calendar-dialog select, .campus-calendar-dialog textarea { margin-top: 7px; color: #69537c; border-color: #e7ddf0; font-size: 12px; padding: 11px 12px; background: #fefcff; }
+.campus-calendar-dialog input:focus, .campus-calendar-dialog select:focus, .campus-calendar-dialog textarea:focus { outline-color: #ad90d7; }
+.campus-calendar-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+.campus-calendar-dialog .campus-calendar-checkbox { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 22px; font-size: 11px; }
+.campus-calendar-checkbox input { width: 15px; height: 15px; margin: 1px 0 0; accent-color: #8060c2; flex: 0 0 15px; }
+.campus-calendar-form-note { color: #ad98bf; font-size: 10px; line-height: 1.8; margin: -5px 0 20px; }
+.campus-calendar-form-error { color: #b56650; font-size: 11px; margin-top: 10px; }
+.campus-calendar-form-error:empty { display: none; }
+.campus-calendar-dialog-footer { display: flex; justify-content: flex-end; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 25px; }
+.campus-calendar-dialog-footer .button, .campus-calendar-dialog-footer .text-button { font-size: 11px; }
+.campus-calendar-delete { color: #b67a64; margin-right: auto; }
+.campus-detail-date { text-transform: capitalize; color: #715886; font-size: 15px; margin: 0 0 6px; }
+.campus-detail-time { color: #a58ab8; font-size: 12px; margin: 0 0 25px; }
+.campus-detail-description { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; color: #8d779e; line-height: 1.8; }
+.campus-calendar[aria-busy="true"] .campus-calendar-grid { opacity: .65; }
+@media (max-width: 1200px) { .campus-calendar-layout { grid-template-columns: minmax(0,1fr) 205px; } .campus-calendar-agenda { padding: 22px 14px; } .campus-day { min-height: 90px; padding-left: 3px; padding-right: 3px; } }
+@media (max-width: 1000px) { .campus-calendar-layout { grid-template-columns: minmax(0,1fr); } .campus-calendar-agenda { border-left: 0; border-top: 1px solid #eee7f5; } #campus-calendar-agenda { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; } .campus-calendar-empty-mark { display: none; } .campus-calendar-empty { text-align: left; padding: 0; } .campus-agenda-event { margin: 0; } }
+@media (max-width: 600px) { .campus-calendar { border-radius: 17px; margin-bottom: 22px; } .campus-calendar-heading { padding: 22px 17px; gap: 15px; flex-wrap: wrap; } .campus-calendar-heading h2 { font-size: 27px; } .campus-calendar-heading p { font-size: 11px; } .campus-calendar-actions { width: 100%; justify-content: space-between; } .campus-calendar-toolbar { padding: 13px 10px; gap: 12px; } .campus-month-navigation { width: 100%; justify-content: space-between; } .campus-month-navigation h3 { min-width: 0; font-size: 15px; } .campus-month-navigation .text-button { margin: 0; } .campus-calendar-connection { gap: 7px; padding: 0; font-size: 8px; } .campus-calendar-connection .text-button { font-size: 8px; } .campus-calendar-modes { margin-right: auto; } .campus-calendar-mode { font-size: 9px; padding: 5px 8px; } .campus-day { min-height: 86px; padding: 4px 2px 5px; } .campus-calendar.is-week .campus-day { min-height: 135px; padding-top: 7px; } .campus-calendar.is-week .campus-calendar-grid { min-height: 135px; } .campus-day-number { width: 23px; height: 23px; font-size: 10px; } .campus-calendar-event { font-size: 8px; padding: 2px 3px; border-left-width: 1px; margin-bottom: 2px; } .campus-calendar-event:nth-of-type(n+4) { display: none; } .campus-calendar-more { font-size: 8px; padding: 0 2px; } .campus-calendar-legend { gap: 10px; padding: 13px 12px; font-size: 8px; } .campus-calendar-agenda { padding: 20px 17px; } #campus-calendar-agenda { grid-template-columns: minmax(0,1fr); } .campus-calendar-footer { padding: 13px 16px; font-size: 8px; } .campus-calendar-dialog { padding: 22px 18px; border-radius: 17px; } .campus-calendar-form-row { grid-template-columns: 1fr; gap: 0; } .campus-calendar-dialog-heading h2 { font-size: 23px; } .campus-calendar-message { padding: 10px 15px; } }

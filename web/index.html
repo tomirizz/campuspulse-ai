@@ -3,58 +3,64 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <meta name="theme-color" content="#6750db" />
-    <title>CampusPulse — маленькие шаги, большой прогресс</title>
+    <meta name="theme-color" content="#7155da" />
+    <title>CampusPulse — твоя цель, твой учебный план</title>
     <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/assets/style.css?v=0.3.0" />
     <link rel="stylesheet" href="/assets/theme.css?v=0.3.0" />
     <link rel="stylesheet" href="/assets/features.css?v=0.3.0" />
+    <link rel="stylesheet" href="/assets/academic.css?v=0.4.0" />
+    <link rel="stylesheet" href="/assets/notebook.css?v=0.4.0" />
+    <link rel="stylesheet" href="/assets/calendar_studio.css?v=0.4.0" />
     <script src="/assets/game.js?v=0.3.0" defer></script>
     <script src="/assets/features.js?v=0.3.0" defer></script>
     <script src="/assets/app.js?v=0.3.0" defer></script>
+    <script src="/assets/academic.js?v=0.4.0" defer></script>
+    <script src="/assets/notebook.js?v=0.4.0" defer></script>
+    <script src="/assets/calendar_studio.js?v=0.4.0" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#main">К содержимому</a>
     <aside class="sidebar">
-      <a href="#overview" class="brand" aria-label="CampusPulse, обзор"
+      <a href="#academic" class="brand" aria-label="CampusPulse, мои предметы"
         ><span class="brand-mark">cp<span>✳</span></span
-        ><span>CampusPulse<small>LEVEL UP YOUR LEARNING</small></span></a
+        ><span>CampusPulse<small>ТВОЙ УЧЕБНЫЙ МАРШРУТ</small></span></a
       >
       <div class="workspace-label">МОЁ ПРОСТРАНСТВО</div>
       <nav aria-label="Главная навигация">
-        <button data-view="overview" class="nav-item active">
-          <span data-icon="grid"></span>Мой пульс<span class="nav-dot"></span>
+        <button data-view="academic" class="nav-item active">
+          <span data-icon="book"></span>Моя учёба<span class="nav-dot"></span>
         </button>
         <button data-view="chat" class="nav-item">
-          <span data-icon="spark"></span>AI-ассистент<span class="tiny"
+          <span data-icon="spark"></span>Ассистент<span class="tiny"
             >AI</span
           >
         </button>
         <button data-view="tasks" class="nav-item">
-          <span data-icon="check"></span>Миссии<span
+          <span data-icon="check"></span>Задания<span
             class="count"
             id="nav-count"
             >0</span
           >
         </button>
         <button data-view="week" class="nav-item">
-          <span data-icon="calendar"></span>Моя неделя
+          <span data-icon="calendar"></span>Календарь
         </button>
-        <button data-view="journey" class="nav-item">
-          <span data-icon="activity"></span>Мой путь
+        <button data-view="notebook" class="nav-item">
+          <span data-icon="spark"></span>Конспекты
         </button>
-        <button data-view="materials" class="nav-item">
-          <span data-icon="book"></span>Материалы
-        </button>
-        <button data-view="practice" class="nav-item">
-          <span data-icon="spark"></span>Практика
-        </button>
+        <details class="nav-more"><summary>Ещё инструменты <span>＋</span></summary><div>
+          <button data-view="materials" class="nav-item"><span data-icon="book"></span>Материалы</button>
+          <button data-view="overview" class="nav-item"><span data-icon="grid"></span>Мой пульс</button>
+          <button data-view="journey" class="nav-item"><span data-icon="activity"></span>Мой путь</button>
+          <button data-view="practice" class="nav-item"><span data-icon="spark"></span>Практика</button>
+        </div></details>
       </nav>
       <div class="sidebar-bottom">
         <div class="sidebar-note">
           <span class="small-spark">✳</span
-          ><strong>Учись в своём темпе</strong>
-          <p>Большие задачи становятся проще, когда есть понятный план.</p>
+          ><strong>Твоя цель достижима?</strong>
+          <p>Добавь оценки — увидишь, сколько нужно набрать дальше.</p>
         </div>
         <button data-view="settings" class="nav-item">
           <span data-icon="settings"></span>Подключения и данные
@@ -68,25 +74,26 @@
     </aside>
     <div class="shell">
       <header class="topbar">
-        <div class="breadcrumb">
+        <div class="topbar-location"><button type="button" class="header-back" id="header-back" disabled aria-label="Назад" title="Это первый экран">← <span>Назад</span></button><div class="breadcrumb">
           Моё пространство <span>/</span>
-          <strong id="page-name">Мой пульс</strong>
-        </div>
+          <strong id="page-name">Мои предметы</strong>
+        </div></div>
         <div class="top-right">
-          <span id="top-date"></span><span class="version">v0.3</span
+          <span id="top-date"></span><span class="version">CAMPUS WORKSPACE</span
           ><button class="top-level" data-view="journey" id="top-level">
             Уровень 1</button
           ><button
             class="icon-button"
-            data-view="settings"
-            aria-label="Настройки"
+            id="header-study-settings"
+            aria-label="Настроить учебный план"
+            title="Настроить учебный план"
           >
             <span data-icon="settings"></span>
           </button>
         </div>
       </header>
       <main id="main">
-        <section id="view-overview" class="view">
+        <section id="view-overview" class="view" hidden>
           <div class="page-heading pulse-heading">
             <div>
               <div class="eyebrow">ТВОЁ ПРОСТРАНСТВО РОСТА</div>
@@ -257,6 +264,36 @@
             ><span>GDG Astana · Build with AI</span>
           </div>
         </section>
+        <section id="view-academic" class="view">
+          <div class="section-heading academic-heading">
+            <div>
+              <div class="eyebrow">CAMPUSPULSE</div>
+              <h1>Что учим сегодня?</h1>
+              <p class="subtitle">Понятная цель и один следующий шаг.</p>
+            </div>
+            <div class="academic-actions academic-header-actions">
+              <button class="button primary" id="academic-import">＋ Силлабус</button>
+              <button class="text-button" id="academic-add">Вручную</button>
+            </div>
+          </div>
+          <div id="academic-status" class="academic-status" role="status" aria-live="polite"></div>
+          <div id="academic-demo-banner"></div>
+          <div id="academic-overview"></div>
+          <div class="academic-section-line" id="academic-courses-heading">
+            <div><h2>Мои предметы <span id="academic-course-count" class="academic-count">0</span></h2><p class="muted">Сначала — то, что стоит подтянуть.</p></div>
+            <button class="text-button" id="academic-how">Почему такой порядок?</button>
+          </div>
+          <div id="academic-courses" class="academic-courses" aria-live="polite"></div>
+          <section class="academic-plan-section" id="academic-plan-section" aria-labelledby="academic-plan-title">
+            <div class="academic-section-line">
+              <div><h2 id="academic-plan-title">Твой учебный план</h2><p class="muted">Мы уже распределили время. Можно подстроить под себя.</p></div>
+              <div class="academic-actions"><button class="text-button" id="academic-schedule-import">＋ Расписание</button><button class="text-button" id="academic-settings">Настроить время</button></div>
+            </div>
+            <div id="academic-plan"></div>
+          </section>
+          <section id="academic-progress-card" class="academic-progress-card" aria-label="Твой учебный прогресс" hidden></section>
+          <details class="academic-footnote"><summary>О расчётах и шкале GPA</summary><p>Считаем по весам из силлабуса и введённым оценкам. GPA — ориентир по выбранной шкале; правила вуза можно задать в настройках.</p></details>
+        </section>
         <section id="view-chat" class="view" hidden>
           <div class="section-heading">
             <div>
@@ -356,7 +393,7 @@
               </p>
             </div>
             <a class="button secondary" href="/api/plan/calendar.ics"
-              ><span data-icon="download"></span>В календарь</a
+              ><span data-icon="download"></span>Скачать .ics</a
             >
           </div>
           <article class="panel calendar-panel">
@@ -371,6 +408,7 @@
               Напиши событие обычными словами. Если даты или времени не хватает,
               ассистент уточнит.
             </p>
+            <p class="calendar-local-note">Учебный план можно скачать в .ics и импортировать в Google Calendar, Outlook или Apple Calendar. Для прямой записи в Google нужно подключение ниже.</p>
             <form id="event-form" class="inline-form">
               <label class="sr-only" for="event-message"
                 >Событие для календаря</label
@@ -416,8 +454,8 @@
               >Минут в день<input
                 id="pref-minutes"
                 type="number"
-                min="30"
-                max="480"
+                min="15"
+                max="600"
                 step="15"
                 required /></label
             ><label
@@ -425,7 +463,7 @@
                 id="pref-start"
                 type="number"
                 min="0"
-                max="22"
+                max="23"
                 required /></label
             ><label
               >Заканчиваю в<input
@@ -496,15 +534,52 @@
           <div id="plan-risks"></div>
           <div id="week-grid" class="week-grid"></div>
         </section>
+        <section id="view-notebook" class="view" hidden>
+          <div class="section-heading notebook-heading">
+            <div><div class="eyebrow">МАТЕРИАЛЫ ДЛЯ ПОДГОТОВКИ</div><h1>Разберись. Запомни. Сдай.</h1><p class="subtitle">Конспект и короткая самопроверка по твоим лекциям.</p></div>
+            <div class="academic-actions"><button class="text-button" data-view="materials">Все материалы</button><button class="button secondary" id="notebook-new">＋ Новый конспект</button></div>
+          </div>
+          <div id="notebook-status" class="academic-status" role="status" aria-live="polite"></div>
+          <div class="notebook-workspace is-empty is-compose">
+            <aside class="notebook-sources notebook-panel" aria-label="Источники конспекта">
+              <details id="notebook-source-fold" class="notebook-source-fold" open><summary>Материалы <span id="notebook-source-count" class="academic-count">0</span></summary>
+              <p class="notebook-caption">Нужные уже выбраны. Можно изменить.</p>
+              <div id="notebook-source-list"></div>
+              <div class="notebook-source-actions"><label class="button secondary notebook-upload-label">↑ Загрузить источник<input id="notebook-upload" type="file" class="sr-only" accept=".pdf,.txt,.md" /></label><button class="text-button" id="notebook-paste">Вставить текст конспекта</button></div>
+              </details>
+              <div class="notebook-saved-heading"><h3>Мои конспекты</h3><small id="notebook-saved-count"></small></div><div id="notebook-saved-list"></div>
+            </aside>
+            <div class="notebook-center">
+              <article class="notebook-composer notebook-panel" id="notebook-composer">
+                <div class="notebook-panel-header"><div><span class="notebook-welcome-icon">▤</span><h2 id="notebook-composer-title">Добавь лекцию — получи конспект</h2></div></div>
+                <p id="notebook-selection-hint" class="notebook-compose-hint">Загрузить файл или вставить текст — больше ничего обязательного.</p>
+                <p class="academic-form-help" data-processing="fragments">Проверяем режим обработки…</p>
+                <div id="notebook-quickstart" class="notebook-quickstart"><label class="button primary" for="notebook-upload">↑ Загрузить материал</label><button type="button" class="button secondary" id="notebook-quick-paste">Вставить текст</button></div>
+                <form id="notebook-form" hidden>
+                  <details id="notebook-options" class="notebook-options"><summary>Настроить конспект</summary>
+                  <label>Название конспекта<input id="notebook-title" maxlength="160" placeholder="Например, Всё к экзамену по линейной алгебре" /></label>
+                  <label>На чём сделать акцент?<textarea id="notebook-focus" rows="2" maxlength="300" placeholder="Например, определения, формулы и основные идеи. Можно оставить пустым."></textarea></label>
+                  <div class="notebook-style-options" role="group" aria-label="Формат конспекта"><label><input type="radio" name="notebook-style" value="summary" checked /><span>↳ Краткий конспект</span></label><label><input type="radio" name="notebook-style" value="exam" /><span>◎ К экзамену</span></label><label><input type="radio" name="notebook-style" value="flashcards" /><span>▤ Карточки</span></label></div>
+                  </details>
+                  <button class="button primary" type="submit" id="notebook-generate">Подготовить конспект →</button>
+                </form>
+                <div class="notebook-two-hints"><span>↗ Ссылки в тексте ведут к нужной странице.</span><span>◎ Вопросы помогут проверить себя.</span></div>
+              </article>
+              <article class="notebook-document notebook-panel" id="notebook-document" aria-live="polite" hidden></article>
+            </div>
+            <aside class="notebook-studio notebook-panel" aria-label="Инструменты обучения" hidden><details id="notebook-tools-fold" open><summary>Проверь себя</summary><div id="notebook-study-tools"></div></details></aside>
+          </div>
+        </section>
         <section id="view-materials" class="view" hidden>
           <div class="section-heading">
             <div>
               <div class="eyebrow">ЗНАНИЯ ПОД РУКОЙ</div>
               <h1>Материалы<span class="green">.</span></h1>
               <p class="subtitle">
-                Загрузи лекцию и задай ассистенту вопрос по содержанию.
+                Лекции, конспекты и силлабусы. Найди точную цитату или проверь себя.
               </p>
             </div>
+            <div class="academic-actions"><button class="button secondary" data-view="notebook">Открыть студию знаний ↗</button><button class="button primary" id="material-note-open">＋ Вставить конспект</button></div>
           </div>
           <label class="upload-area" id="upload-area" for="material-upload"
             ><span class="upload-icon" data-icon="upload"></span
@@ -584,6 +659,7 @@
             <div id="quest-session" aria-live="polite"></div>
           </article>
           <article class="panel practice-panel" id="practice-grades" hidden>
+            <div class="academic-source-notice"><strong>Сохранять оценки и видеть цели по всем предметам удобнее в «Моих предметах».</strong><p>Там можно оставить несколько заданий без оценки, импортировать силлабус и получить план по каждому.</p><button type="button" class="text-button" data-view="academic">Открыть мои предметы →</button></div>
             <h2>Сколько нужно набрать?</h2>
             <p class="muted">
               Для курса с взвешенной суммой оценок. Введи реальные веса из
@@ -703,6 +779,11 @@
               </p>
             </div>
           </div>
+          <article class="panel setting-panel settings-start">
+            <h2>Первый раз здесь? Начни с учёбы</h2>
+            <p>Добавь силлабус и расписание вместе. Проверь найденные работы, внеси оценки — мы покажем нужные баллы и свободное время для подготовки.</p>
+            <div class="settings-actions"><button type="button" class="button primary" id="settings-start-study">Добавить предмет и расписание →</button><button type="button" class="button secondary" data-view="academic">Открыть мою учёбу</button><button type="button" class="text-button" id="settings-study-time">Настроить свободное время</button></div>
+          </article>
           <div id="integration-cards" class="integration-grid"></div>
           <article class="panel setting-panel">
             <h2>Google Calendar</h2>
@@ -731,18 +812,87 @@
             <div class="settings-actions">
               <button class="button secondary" id="add-demo">
                 Добавить учебный пример</button
-              ><button class="button danger" id="clear-data">
+              ><button class="text-button" id="remove-demo" hidden>Убрать учебный пример</button><button class="button danger" id="clear-data">
                 Удалить мои данные
               </button>
             </div>
             <small class="muted"
-              >Учебный пример создаёт три явно помеченных задания. Он не
-              используется как источник реальных данных.</small
+              id="settings-demo-description">Учебный пример: 4 предмета, материалы, готовые конспекты и расписание. Его можно убрать отдельно от своих данных. Старые добавленные задания не изменятся.</small
             >
           </article>
         </section>
       </main>
     </div>
+    <dialog id="academic-course-dialog" class="academic-dialog">
+      <form id="academic-course-form">
+        <div class="dialog-heading"><div><div class="eyebrow">ТОЧНЫЕ ДАННЫЕ — ПОНЯТНАЯ ЦЕЛЬ</div><h2 id="academic-editor-title">Новый предмет</h2></div><button type="button" class="icon-button" data-close="academic-course-dialog" aria-label="Закрыть">×</button></div>
+        <div id="academic-source-notice"></div>
+        <label>Название предмета<input id="academic-name" maxlength="160" placeholder="Например, High Performance Computing" required /></label>
+        <div class="academic-form-grid">
+          <label>Кредиты<input id="academic-credits" type="number" min="0.5" max="30" step="0.5" value="5" required /></label>
+          <label>Период<select id="academic-term"><option value="trimester">Триместр</option><option value="semester">Семестр</option></select></label>
+          <label>Моя цель, %<input id="academic-target" type="number" min="0" max="100" value="95" step="0.1" required /></label>
+          <label>Сложность<select id="academic-difficulty"><option value="">Определить автоматически</option><option value="1">1 · Легко</option><option value="2">2 · Скорее легко</option><option value="3">3 · Средне</option><option value="4">4 · Сложно</option><option value="5">5 · Очень сложно</option></select></label>
+        </div>
+        <div class="academic-section-line"><div><h3>Из чего складывается итог</h3><p class="muted">Укажи вес в итоговой оценке предмета. Сумма должна быть 100%.</p></div><button type="button" class="text-button" id="academic-component-add">＋ Задание</button></div>
+        <div class="academic-editor-scroll"><div class="academic-component-labels"><span>Задание / экзамен</span><span>Вес, %</span><span>Баллы / максимум</span><span>Дедлайн</span><span></span></div><div id="academic-components"></div></div>
+        <div class="academic-weight-total" id="academic-weight-total" role="status"></div>
+        <details class="academic-form-help"><summary>Как указать вес и оценку?</summary><p>Вес указывается для итоговой оценки предмета. Например, 40% внутри аттестации весом 30% — это 12%. Баллы вводятся в исходной шкале: например, 15 из 20. По умолчанию максимум 100. Пустая оценка означает «ещё не сдано», а 0 — ноль баллов.</p></details>
+        <div id="academic-editor-error" class="academic-error" role="alert" hidden></div>
+        <div class="dialog-footer"><button type="button" class="button secondary" data-close="academic-course-dialog">Отмена</button><button type="submit" class="button primary" id="academic-course-save">Сохранить предмет</button></div>
+      </form>
+    </dialog>
+    <dialog id="academic-import-dialog" class="academic-dialog">
+      <div class="dialog-heading"><div><div class="eyebrow">ИЗ ДОКУМЕНТА В ПЛАН</div><h2 id="academic-import-title">Добавить учёбу</h2></div><button type="button" class="icon-button" data-close="academic-import-dialog" aria-label="Закрыть">×</button></div>
+      <p id="academic-import-description" class="muted">Извлечём название, кредиты и веса заданий. Перед сохранением ты сможешь всё проверить.</p>
+      <p class="academic-form-help" data-processing="documents">Проверяем режим обработки…</p>
+      <form id="academic-import-form">
+        <label>Что добавляем?<select id="academic-import-mode"><option value="combined">Предмет и расписание вместе</option><option value="syllabus">Только предмет / силлабус</option><option value="schedule">Только расписание</option></select></label>
+        <fieldset class="academic-import-source"><legend id="academic-primary-label">1. Силлабус — раздел с оцениванием</legend>
+          <label class="academic-source-select">Как передать?<select id="academic-source-mode"><option value="text">Вставить текст</option><option value="file">Выбрать файл</option></select></label>
+          <div id="academic-primary-file-wrap" hidden><label class="academic-dropzone">↑ Выбрать файл<input id="academic-import-file" type="file" accept=".pdf,.txt,.md,.png,.jpg,.jpeg" /><small>PDF, текст или изображение · до 5 МБ</small></label><button type="button" class="text-button" id="academic-import-clear-file" hidden>Убрать выбранный файл ×</button></div>
+          <div id="academic-primary-text-wrap"><label>Текст документа<textarea id="academic-import-text" rows="6" maxlength="60000" placeholder="Вставь раздел с оцениванием, название предмета и кредиты…"></textarea></label></div>
+        </fieldset>
+        <fieldset class="academic-import-source" id="academic-combined-schedule" hidden><legend>2. Расписание занятий — необязательно</legend>
+          <p class="academic-form-help">Можно добавить сейчас или позже. Принимаем дни недели со временем, например: Monday · 15:00–15:50 — Mathematics.</p>
+          <label class="academic-source-select">Как передать?<select id="academic-schedule-source-mode"><option value="text">Вставить текст</option><option value="file">Выбрать файл</option></select></label>
+          <div id="academic-secondary-file-wrap" hidden><label class="academic-dropzone">↑ Выбрать расписание<input id="academic-import-schedule-file" type="file" accept=".pdf,.txt,.md,.png,.jpg,.jpeg" /><small>До 5 МБ</small></label><button type="button" class="text-button" id="academic-import-clear-schedule-file" hidden>Убрать выбранный файл ×</button></div>
+          <div id="academic-secondary-text-wrap"><label>Текст расписания<textarea id="academic-import-schedule-text" rows="5" maxlength="60000" placeholder="Monday / Понедельник\n15:00–15:50 — Название предмета | lecture | Аудитория"></textarea></label></div>
+        </fieldset>
+        <div id="academic-import-year-wrap" hidden><details class="academic-paste-option"><summary>Период расписания</summary><div class="academic-import-period"><label>Неделя начинается<input id="academic-import-anchor" type="date" /></label><label>Повторять недель<input id="academic-import-weeks" type="number" value="12" min="1" max="20" /></label><label>Год, если даты без года<input id="academic-import-year" type="number" value="2026" min="2020" max="2100" /></label></div><p class="academic-form-help">Для дней недели по умолчанию используем текущую неделю и 12 повторений. Явно указанные даты документа не сдвигаются.</p></details></div>
+        <div class="academic-import-tools"><button type="button" class="text-button" id="academic-import-example">Пример силлабуса HPC ↗</button><button type="submit" class="button primary" id="academic-import-submit">Распознать документ →</button></div>
+      </form>
+      <div id="academic-import-feedback" role="status"></div>
+      <div id="academic-schedule-preview"></div>
+    </dialog>
+    <dialog id="academic-detail-dialog" class="academic-dialog academic-detail-dialog">
+      <div class="dialog-heading"><div><div class="eyebrow">КАЖДЫЙ БАЛЛ ИМЕЕТ ЗНАЧЕНИЕ</div><h2 id="academic-detail-title"></h2></div><button type="button" class="icon-button" data-close="academic-detail-dialog" aria-label="Закрыть">×</button></div>
+      <div id="academic-detail-content"></div>
+    </dialog>
+    <dialog id="academic-time-dialog" class="academic-dialog academic-time-dialog">
+      <form id="academic-time-form">
+        <div class="dialog-heading"><div><div class="eyebrow">УЧЁБА В ТВОЁМ РИТМЕ</div><h2>Сколько времени выделить?</h2></div><button type="button" class="icon-button" data-close="academic-time-dialog" aria-label="Закрыть">×</button></div>
+        <p class="muted">Начнём с 3 часов в день с 16:00 до 22:00. Можно поменять в любой момент. Занятые окна из расписания исключаются автоматически.</p>
+        <label>Минут на самостоятельную учёбу в день<input id="academic-daily-minutes" type="number" min="15" max="600" step="15" value="180" required /></label>
+        <div class="form-row"><label>Можно начать с<select id="academic-start-hour"></select></label><label>Закончить до<select id="academic-end-hour"></select></label></div>
+        <div class="form-row"><label>Цель по умолчанию, %<input id="academic-preferred-target" type="number" min="70" max="100" value="95" /></label><label>Нижняя ступень цели, %<input id="academic-min-target" type="number" min="0" max="95" value="70" /></label></div>
+        <p class="academic-form-help">Новый предмет получает эту цель. Если она уже математически недостижима, расчёт выберет следующую доступную ступень. Уже введённые оценки сохраняются.</p>
+        <details class="academic-scale-settings"><summary>Моё загруженное расписание</summary><div id="academic-saved-schedule"></div></details>
+        <details class="academic-scale-settings"><summary>Моя шкала GPA</summary><p class="academic-form-help">Личная шкала: 70 → 2.0 и 65 → 1.67. Остальные значения предварительные — проверь правила своего университета.</p><div class="academic-scale-head"><span>От, %</span><span>Буква</span><span>GPA</span></div><div id="academic-grade-scale"></div></details>
+        <div id="academic-time-error" class="academic-error" role="alert" hidden></div>
+        <div class="dialog-footer"><button type="button" class="button secondary" data-close="academic-time-dialog">Отмена</button><button type="submit" class="button primary">Перестроить план</button></div>
+      </form>
+    </dialog>
+    <dialog id="material-note-dialog" class="academic-dialog">
+      <form id="material-note-form">
+        <div class="dialog-heading"><div><div class="eyebrow">ЗНАНИЯ ИЗ ТВОИХ ЗАМЕТОК</div><h2>Добавить конспект</h2></div><button type="button" class="icon-button" data-close="material-note-dialog" aria-label="Закрыть">×</button></div>
+        <label>Название<input id="material-note-name" maxlength="100" placeholder="Например, Лекция 3 — Производные" required /></label>
+        <label>Текст конспекта<textarea id="material-note-text" rows="12" minlength="10" maxlength="60000" placeholder="Вставь заметки с лекции. Для тренировки терминов подойдут строки «термин: определение»." required></textarea></label>
+        <p class="academic-form-help">Конспект сохранится как текстовый материал. Он участвует в поиске цитат и учебных тренировках. До 60 000 символов.</p>
+        <div id="material-note-error" class="academic-error" role="alert" hidden></div>
+        <div class="dialog-footer"><button type="button" class="button secondary" data-close="material-note-dialog">Отмена</button><button type="submit" class="button primary">Сохранить конспект</button></div>
+      </form>
+    </dialog>
     <dialog id="task-dialog">
       <form id="task-form">
         <div class="dialog-heading">

@@ -18,7 +18,7 @@ def main():
     parser.add_argument("--project", required=True)
     parser.add_argument("--bucket", required=True, help="Existing gs:// staging bucket")
     parser.add_argument("--region", default="us-central1")
-    parser.add_argument("--model", default="gemini-3.6-flash")
+    parser.add_argument("--model", default="gemini-3.8-flash")
     parser.add_argument("--gemini-location", default="global")
     parser.add_argument("--update", help="Existing resource name to update; avoids duplicate agents")
     args = parser.parse_args()

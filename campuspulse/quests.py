@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 import uuid
 
 from campuspulse.progress import proof
-from campuspulse.study import quest_candidates, normalize_answer
+from campuspulse.study import quest_candidates, normalize_answer, quest_fact_from_source
 
 
 def public_quest(quest):
@@ -52,11 +52,27 @@ def answer_quest(store, sid, quest_id, question_id, answer):
     value = store.update(sid, "quests", quest_id, update)
     if not value:
         raise ValueError("Квест не найден в этом пространстве")
+    # Keep all previously earned rows intact. Old releases keyed rewards by the
+    # unnormalised question text; recover their canonical claim from the quote.
+    claimed = set()
+    for existing in store.list(sid, "quest_rewards"):
+        claimed.add(existing["id"])
+        if existing.get("fact_id"):
+            claimed.add(existing["fact_id"])
+        legacy_source = existing.get("why", {}).get("inputs", {}).get("источник")
+        canonical = quest_fact_from_source(legacy_source)
+        if canonical:
+            claimed.add(canonical)
     # Idempotent inserts also repair a crash between saving an answer and awarding XP.
     for item in value["answers"]:
         if item["correct"]:
-            store.put_once(sid, "quest_rewards", item["question_id"], {
-                "id": item["question_id"], "title": "Квест: " + item["expected"], "xp": 10, "at": item["at"],
+            identity = quest_fact_from_source(item["source"], item["expected"]) or item["question_id"]
+            if identity in claimed:
+                continue
+            store.put_once(sid, "quest_rewards", identity, {
+                "id": identity, "fact_id": identity, "question_id": item["question_id"],
+                "title": "Квест: " + item["expected"], "xp": 10, "at": item["at"],
                 "why": proof("Опыт за учебный квест", "10 XP × 1 уникальный правильно восстановленный факт", {"question_id": item["question_id"], "источник": item["source"]},
                 10, "quests.answer_quest → quest_rewards", "Одинаковый факт даёт награду один раз, включая повторную загрузку того же материала.")})
+            claimed.add(identity)
     return public_quest(value)

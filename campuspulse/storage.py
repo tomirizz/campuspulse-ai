@@ -96,7 +96,7 @@ class FirestoreStore:
         return change(self.client.transaction())
 
     def clear(self, sid):
-        for kind in ("tasks", "materials", "meta", "private", "quests", "quest_rewards", "calendar_events"):
+        for kind in ("tasks", "materials", "meta", "private", "quests", "quest_rewards", "calendar_events", "courses", "course_drafts", "notebooks", "local_events"):
             for doc in self.collection(sid, kind).stream():
                 doc.reference.delete()
 

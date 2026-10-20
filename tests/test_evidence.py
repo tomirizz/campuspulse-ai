@@ -28,3 +28,14 @@ def test_explanation_category_comes_from_sources_not_model_guess():
     r=grounded_answer('{"fact_ids":["S1-2"],"explanation":"deadline_first"}',trace())
     assert r['answer'].startswith('Ниже приведены точные фрагменты')
     assert 'Ближайшие сроки' not in r['answer']
+
+
+def test_json_markdown_wrapper_preserves_strict_fact_validation():
+    marker = chr(96) * 3
+    good = '{"fact_ids":["S1-2"],"explanation":"source_quote"}'
+    result = grounded_answer(marker + 'json\n' + good + '\n' + marker, trace())
+    assert result["grounded"] and "Step size is 0.01." in result["answer"]
+    for text in ('Here is the answer:\n' + marker + 'json\n' + good + '\n' + marker,
+                 marker + 'json\n' + good + '\n' + marker + '\nMore text',
+                 marker + 'json\n{"fact_ids":["invented"],"explanation":"observed"}\n' + marker):
+        assert grounded_answer(text, trace())["grounded"] is False
