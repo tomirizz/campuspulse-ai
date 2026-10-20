@@ -188,7 +188,7 @@ class GoogleCalendar:
         body = {"id": draft["event_id"], "summary": draft["title"],
                 "start": {"dateTime": start.isoformat(), "timeZone": draft["timezone"]},
                 "end": {"dateTime": end.isoformat(), "timeZone": draft["timezone"]},
-                "description": "Создано по явному запросу пользователя в CampusPulse.",
+                "description": "Создано по явному запросу пользователя в CampusPulse." + ("\n\n" + draft["description"] if draft.get("description") else ""),
                 "extendedProperties": {"private": {"campuspulseRequest": draft["event_id"]}},
                 "reminders": {"useDefault": False}}
         response = await self._request("POST", json=body, params={"sendUpdates": "none"})

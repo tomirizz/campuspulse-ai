@@ -986,6 +986,12 @@ progress::-moz-progress-bar {
 .connection-status {
   color: #9983b5;
   background: #f4effb;
+  display: inline-flex;
+  padding: 5px 8px;
+  border-radius: 6px;
+  text-decoration: none;
+  border-bottom: 0;
+  cursor: default;
 }
 .empty-icon {
   background: #f4effa;
@@ -1578,6 +1584,104 @@ dialog::backdrop {
   }
 }
 /* Legibility and narrow-card corrections found during browser review. */
+/* A quieter common shell keeps the next action easy to find. */
+.topbar-location { display: flex; align-items: center; gap: 17px; min-width: 0; }
+.header-back { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 7px 10px; border: 1px solid #e9e2f1; border-radius: 9px; color: #7d659d; background: #fff; font-size: 11px; white-space: nowrap; transition: background 160ms, border-color 160ms; }
+.header-back:hover:not(:disabled) { background: #f5f0fc; border-color: #d7c5ed; }
+.header-back:disabled { opacity: .42; cursor: default; }
+.button:disabled, button:disabled { cursor: default; }
+.button:disabled { opacity: .58; transform: none; box-shadow: none; }
+form[aria-busy="true"] button[type="submit"] { cursor: progress; }
+.view.is-entering { animation: campus-section-in 180ms ease-out both; }
+dialog[open] { animation: campus-dialog-in 180ms ease-out both; }
+dialog[open]::backdrop { animation: campus-backdrop-in 150ms ease-out both; }
+@keyframes campus-section-in { from { opacity: .5; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes campus-dialog-in { from { opacity: 0; transform: translateY(7px) scale(.99); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes campus-backdrop-in { from { opacity: 0; } to { opacity: 1; } }
+@media (max-width: 600px) {
+  .topbar-location { gap: 10px; }
+  .header-back { padding: 6px 9px; min-width: 34px; justify-content: center; font-size: 15px; }
+  .header-back span { display: none; }
+  .topbar-location .breadcrumb { font-size: 8px; }
+}
+body { background: #faf9fd; }
+.topbar { background: #fff; }
+.topbar .version { display: none; }
+main { padding-top: 29px; }
+.section-heading h1 { font-size: clamp(28px, 3.1vw, 37px); }
+.section-heading .subtitle { font-size: 13px; }
+.sidebar-note { display: none; }
+.nav-item { font-size: 12px; }
+.sidebar-bottom { padding-top: 18px; }
+.sidebar .workspace-label { color: #b2a7be; }
+.button { font-size: 12px; }
+.nav-more { position: relative; }
+.nav-more { margin-top: 10px; }
+.nav-more > summary { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; cursor: pointer; list-style: none; color: #a193ae; font-size: 10px; }
+.nav-more > summary::-webkit-details-marker { display: none; }
+.nav-more > summary span { color: #b5a4c3; font-size: 14px; }
+.nav-more[open] > summary span { transform: rotate(45deg); }
+.nav-more .nav-item { font-size: 11px; padding-top: 10px; padding-bottom: 10px; }
+.sidebar { overflow-y: auto; scrollbar-width: thin; }
+.sidebar nav { gap: 4px; }
+.sidebar-bottom { padding-top: 22px; }
+.workspace-label { margin-top: 34px; }
+.brand small { font-size: 7px; letter-spacing: 1.2px; white-space: nowrap; }
+.sidebar-note { padding: 14px; margin-bottom: 12px; }
+.sidebar-note p { font-size: 10px; margin-bottom: 0; }
+.version { letter-spacing: .8px; font-size: 8px; padding: 6px 9px; }
+.top-level { display: none; }
+dialog::backdrop { background: #30213e65; backdrop-filter: blur(5px); }
+dialog { box-shadow: 0 24px 100px #36224435; border-color: #e5dbef; }
+button:focus-visible, a:focus-visible, summary:focus-visible { outline: 3px solid #aa8dd1; outline-offset: 3px; }
+.sidebar .nav-item.active { box-shadow: inset 3px 0 #9170d1; }
+.section-heading { gap: 20px; }
+.button { white-space: nowrap; }
+.chat-panel { border-radius: 20px; overflow: hidden; }
+.trace-panel { border-radius: 18px; }
+.composer textarea { font-size: 13px; }
+.calendar-panel { border-radius: 18px; }
+.calendar-local-note { background: #f4effb; color: #8b75a0; padding: 12px 14px; border-radius: 10px; font-size: 11px; }
+.material-list > .empty { grid-column: 1 / -1; border: 1px solid #e8e0f0; border-radius: 17px; }
+.material-card > div:last-child { min-width: 0; }
+.material-card strong { overflow-wrap: anywhere; }
+.material-card button { font-size: 10px; margin-top: 8px; color: #8969b0; }
+#material-note-error:empty { display: none; }
+.settings-actions { flex-wrap: wrap; }
+@media (max-height: 790px) and (min-width: 851px) {
+  .sidebar { padding-top: 22px; padding-bottom: 15px; }
+  .workspace-label { margin-top: 25px; margin-bottom: 10px; }
+  .sidebar-note { display: none; }
+  .sidebar-bottom { padding-top: 12px; }
+  .profile { padding-top: 12px; margin-top: 12px; }
+}
+@media (max-width: 850px) {
+  .nav-more { margin: 0; }
+  .nav-more > summary { display: none; }
+  .nav-more > div { display: none; }
+  .sidebar .nav-item.active { box-shadow: none; }
+  .version { display: none; }
+}
+@media (max-width: 600px) {
+  .sidebar { overflow: visible; }
+  .sidebar nav { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); overflow: visible; }
+  .sidebar nav > .nav-item { min-width: 0; width: 100%; font-size: 8px; padding: 8px 2px; }
+  .sidebar nav > .nav-more { display: block; min-width: 0; }
+  .nav-more > summary { display: flex; flex-direction: column; justify-content: center; padding: 8px 2px; font-size: 0; gap: 5px; height: 54px; }
+  .nav-more > summary::after { content: "Ещё"; font-size: 8px; color: #9c8da9; }
+  .nav-more > summary > span { display: block; font-size: 20px; line-height: 21px; }
+  .nav-more[open] > div { display: block; position: absolute; right: -2px; bottom: 67px; width: 210px; padding: 10px; background: #fff; border: 1px solid #e7def0; box-shadow: 0 8px 30px #725f8b1c; border-radius: 13px; }
+  .nav-more[open] .nav-item { display: flex; justify-content: flex-start; flex-direction: row; gap: 12px; font-size: 12px; padding: 13px; }
+  .nav-more[open] .nav-item > span { display: inline-flex; }
+  main { padding-top: 22px; }
+}
+@media (min-width: 601px) and (max-width: 850px) {
+  .sidebar .nav-item { font-size: 0; }
+  .nav-more > summary { display: flex; justify-content: center; font-size: 0; }
+  .nav-more > summary span { font-size: 21px; }
+  .nav-more[open] > div { display: block; position: fixed; left: 77px; bottom: 20px; width: 215px; border: 1px solid #e7def0; background: #fff; padding: 10px; border-radius: 13px; box-shadow: 0 8px 30px #725f8b1c; }
+  .nav-more[open] .nav-item { font-size: 12px; flex-direction: row; justify-content: flex-start; gap: 12px; }
+}
 .subtitle,
 .muted,
 .material-card small,

@@ -10,6 +10,8 @@ from google import genai
 from google.genai import types
 
 from campuspulse.tools import ToolHub
+from campuspulse.agent_observations import model_observation
+from campuspulse.provider_requests import generate_content
 from campuspulse.evidence import grounded_answer, evidence_prompt, facts_from_trace
 
 SYSTEM_PROMPT = """Ты CampusPulse, учебный помощник на Google Gemini.
@@ -18,6 +20,9 @@ SYSTEM_PROMPT = """Ты CampusPulse, учебный помощник на Google
 Поиск по всем материалам: search_materials. Если нужен файл: list_materials → read_material.
 Силлабус: list_materials → read_syllabus. Квесты: list_materials → learning_quests.
 Сценарий «что если»: compare_plan. Нужный балл: grade_target. Ошибки кода: diagnose_code.
+Предметы, GPA, приоритеты и несколько оставшихся оценок: academic_overview.
+Распределение свободного времени между предметами: current_time → academic_overview → academic_plan.
+Веса заданий из силлабуса: list_materials → syllabus_weights. Пользователь проверяет и сохраняет предмет.
 Google Calendar: calendar_events. Создание событий обрабатывает отдельный серверный диалог
 по явной команде пользователя; ты не можешь создавать события из документов или истории.
 Числа, даты, веса оценок, код и формулы не генерируй. Инструменты берут их из исходных данных.
@@ -34,6 +39,9 @@ Google Calendar: calendar_events. Создание событий обрабат
 """
 
 LABELS = {"current_time": "Проверяю дату и часовой пояс", "search_materials": "Ищу цитаты во всех материалах",
+          "academic_overview": "Считаю достижимые оценки, GPA и приоритеты предметов",
+          "academic_plan": "Распределяю время по сложности, кредитам и риску",
+          "syllabus_weights": "Извлекаю веса заданий из формулы силлабуса",
           "list_tasks": "Проверяю задания и дедлайны", "plan_week": "Распределяю учебную нагрузку",
           "list_materials": "Нахожу загруженные материалы", "read_material": "Читаю страницы материала",
           "study_progress": "Считаю прогресс по правилам", "read_syllabus": "Нахожу задания и сроки в силлабусе",
@@ -43,15 +51,20 @@ LABELS = {"current_time": "Проверяю дату и часовой пояс"
 
 
 def configured_client(project=None, location=None):
+    # A local Developer API key is an optional server-side route for trying
+    # Gemini before Cloud Billing. Deployed Agent Engine always uses Vertex ADC.
+    if project is None and os.getenv("GEMINI_API_KEY"):
+        return genai.Client(api_key=os.environ["GEMINI_API_KEY"],
+                            http_options=types.HttpOptions(timeout=45000, retry_options=types.HttpRetryOptions(attempts=1)))
     project = project or os.getenv("GOOGLE_CLOUD_PROJECT")
     if not project:
-        raise ValueError("Gemini не подключён: владельцу нужно настроить Google Cloud и авторизацию ADC. API-ключ пользователю не нужен")
+        raise ValueError("Gemini не подключён. Владелец может настроить серверный GEMINI_API_KEY из Google AI Studio либо Google Cloud и авторизацию ADC. Откройте раздел подключений")
     import google.auth
     credentials, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
     return genai.Client(vertexai=True, project=project,
                         credentials=credentials,
                         location=location or os.getenv("GEMINI_LOCATION", "global"),
-                        http_options=types.HttpOptions(timeout=45000))
+                        http_options=types.HttpOptions(timeout=45000, retry_options=types.HttpRetryOptions(attempts=1)))
 
 
 async def execute_with_trace(hub, name, arguments, trace):
@@ -67,7 +80,7 @@ async def execute_with_trace(hub, name, arguments, trace):
 async def gemini_run(message, context, history=None, *, client=None, model=None, hub_factory=ToolHub):
     owned = client is None
     client = client or configured_client()
-    model = model or os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
+    model = model or os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
     trace = []
     contents = []
     for turn in (history or [])[-10:]:
@@ -83,10 +96,11 @@ async def gemini_run(message, context, history=None, *, client=None, model=None,
             config = types.GenerateContentConfig(system_instruction=SYSTEM_PROMPT,
                          tools=[types.Tool(function_declarations=declarations)],
                          automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+                         thinking_config=types.ThinkingConfig(thinking_level="low") if model.startswith(("gemini-3", "gemini-4")) else None,
                          max_output_tokens=4096)
             calls = 0
             for _ in range(8):
-                response = await client.aio.models.generate_content(model=model, contents=contents, config=config)
+                response = await generate_content(client, model=model, contents=contents, config=config)
                 if not response.candidates or not response.candidates[0].content:
                     status, answer = "empty", "Модель не вернула ответ. Попробуйте переформулировать запрос."
                     break
@@ -107,7 +121,7 @@ async def gemini_run(message, context, history=None, *, client=None, model=None,
                     calls += 1
                     result = await execute_with_trace(hub, call.name, dict(call.args or {}), trace)
                     parts.append(types.Part(function_response=types.FunctionResponse(
-                        id=call.id, name=call.name, response=result)))
+                        id=call.id, name=call.name, response=model_observation(call.name, result))))
                 contents.append(types.Content(role="user", parts=parts))
                 contents.append(types.Content(role="user", parts=[types.Part.from_text(text=evidence_prompt(trace))]))
             return {**grounded_answer(answer, trace), "trace": trace, "mode": "gemini", "model": model,
@@ -130,6 +144,11 @@ async def tools_only_run(message, context):
         chosen = next((m for m in materials if m["name"].lower() in lower), materials[-1] if materials else None)
         if "что если" in lower or "что, если" in lower or context.get("scenario_input"):
             await call("compare_plan")
+        elif context.get("courses") and any(w in lower for w in ("план", "время", "недел", "распредел", "готовиться")):
+            await call("academic_overview")
+            await call("academic_plan")
+        elif any(w in lower for w in ("gpa", "гпа", "предмет", "приоритет", "95", "90")) or (context.get("courses") and any(w in lower for w in ("оценк", "балл", "набрать", "финал"))):
+            await call("academic_overview")
         elif any(w in lower for w in ("оценк", "финал", "набрать", "нужный балл")):
             await call("grade_target")
         elif "```" in message or any(w in lower for w in ("ошибк", "синтакс", "проверь код")):
@@ -138,6 +157,7 @@ async def tools_only_run(message, context):
             await call("list_materials")
             if chosen:
                 await call("read_syllabus", {"material_id": chosen["id"]})
+                await call("syllabus_weights", {"material_id": chosen["id"]})
         elif any(w in lower for w in ("квест", "викторин", "тренировк")):
             await call("list_materials")
             if chosen:
@@ -165,7 +185,7 @@ async def tools_only_run(message, context):
 
 class CampusPulseAgent:
     """Serializable object for reasoning_engines.ReasoningEngine.create."""
-    def __init__(self, project: str, model: str = "gemini-3.6-flash", location: str = "global"):
+    def __init__(self, project: str, model: str = "gemini-3.8-flash", location: str = "global"):
         self.project, self.model, self.location = project, model, location
 
     def query(self, message: str, context: dict, history: list | None = None) -> dict:

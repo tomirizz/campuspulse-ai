@@ -5,6 +5,7 @@ COPY requirements.lock .
 RUN pip install --no-cache-dir -r requirements.lock
 COPY campuspulse ./campuspulse
 COPY web ./web
+COPY assets ./assets
 RUN useradd --create-home --uid 10001 campuspulse && mkdir /app/data && chown campuspulse /app/data
 USER campuspulse
 EXPOSE 8080

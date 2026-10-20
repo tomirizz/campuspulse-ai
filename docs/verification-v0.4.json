@@ -1,0 +1,55 @@
+{
+  "version": "0.4.0",
+  "verified_at_utc": "2026-10-20T18:02:00Z",
+  "source_base_commit": "55f37ed12ba69171016e7748574e118f5aabe1f0",
+  "automated_tests": {
+    "command": "python -m pytest -q --tb=short",
+    "passed": 439,
+    "failed": 0,
+    "warnings": ["Starlette TestClient httpx deprecation"],
+    "real_local_mcp_subprocess": true,
+    "provider_network_calls": false,
+    "additional_archive_secret_exclusion_regression": "2 passed"
+  },
+  "browser_checks": {
+    "isolated_headless_checks_passed": 60,
+    "viewport_widths": [1280, 390],
+    "javascript_errors": 0,
+    "server_5xx": 0,
+    "horizontal_overflow": false,
+    "paths": [
+      "empty first use",
+      "four-course removable demo",
+      "score save and target recalculation",
+      "material paste and note generation",
+      "source citation and full source page",
+      "real PDF download",
+      "persistence after reload",
+      "course-to-linked-notebook preparation",
+      "local calendar event CRUD and weekly instances",
+      "safe demo-only deletion"
+    ],
+    "manual_in_app_browser": "empty start, demo, course-to-notebook, score 75 to 60 and restored to 75; settings icon opens study preferences; settings start opens combined import; combined syllabus and 21 weekly classes save together; five named course drafts created; selected PDF can be cleared and text mode restored"
+  },
+  "external_services": {
+    "gemini": "Live Developer API and real local HTTP /api/chat verified with gemini-3.5-flash: grounded current_time MCP -> academic_overview -> academic_plan on isolated synthetic input, HTTP 200. Later requests returned quota 429; no quota retry or billing change. Notebook AI and syllabus vision are not live-verified; extractive fallback stays available and labeled.",
+    "google_calendar": "OAuth client configured locally; user consent and live Calendar API not verified",
+    "agent_engine": "scripts and safe Cloud Shell package prepared; no deployment performed",
+    "cloud_run": "not deployed",
+    "firestore": "adapter implemented; not live-verified"
+  },
+  "presentation": {
+    "slides": 9,
+    "editable_pptx": "presentation/CampusPulse-AI-v2.pptx",
+    "pdf": "presentation/CampusPulse-AI-v2.pdf",
+    "all_pages_visually_reviewed": true,
+    "external_service_status_disclosed": true
+  },
+  "limits": [
+    "Configured credentials do not prove provider availability.",
+    "No production-cloud cost, latency, load or security certification is claimed.",
+    "Extractive notes without Gemini are explicitly labeled.",
+    "GPA scale and scholarship target require institution-specific confirmation.",
+    "Free-tier eligibility depends on the API key project billing status; the app does not enable billing."
+  ]
+}

@@ -34,6 +34,7 @@ async function featureRequest(form, action, output) {
   const submit = $('button[type="submit"]', form);
   if (submit?.disabled) return;
   if (submit) submit.disabled = true;
+  form.setAttribute("aria-busy", "true");
   try {
     await action();
   } catch (e) {
@@ -41,6 +42,7 @@ async function featureRequest(form, action, output) {
     toast(e.message, true);
   } finally {
     if (submit) submit.disabled = false;
+    form.setAttribute("aria-busy", "false");
   }
 }
 function quoteCard(source) {
@@ -125,12 +127,10 @@ async function showSyllabus(material) {
     result.grading_rules.forEach((source) => {
       const card = quoteCard(source);
       card.append(
-        button("Использовать в калькуляторе", () => {
-          state.gradeSource = source;
+        button("Создать предмет из силлабуса", () => {
           $("#syllabus-dialog").close();
-          showView("practice");
-          selectPractice("grades");
-          renderGradeSource();
+          showView("academic");
+          window.CampusAcademic?.importMaterial(material.id);
         }),
       );
       area.append(card);
@@ -142,9 +142,13 @@ async function showSyllabus(material) {
 function renderCalendar() {
   const google = state.google || {};
   $("#calendar-status").textContent = google.connected
-    ? "Подключён"
-    : "Не подключён";
+    ? "Google подключён"
+    : google.configured ? "Можно подключить Google" : "Доступен экспорт .ics";
   $("#calendar-connect").hidden = !!google.connected;
+  $("#calendar-connect").disabled = !google.configured;
+  $("#calendar-connect").textContent = google.configured
+    ? "Подключить Google Calendar"
+    : "Вход Google ещё не настроен";
   $("#calendar-disconnect").hidden = !google.connected;
   $("#calendar-sync").disabled = !google.connected;
   $("#calendar-message").textContent = google.connected
@@ -451,6 +455,22 @@ function renderFeatures() {
   }
 }
 function initFeatures() {
+  $("#material-note-open").onclick = openNoteDialog;
+  $("#material-note-form").onsubmit = (event) => {
+    event.preventDefault();
+    featureRequest(event.target, async () => {
+      const name = $("#material-note-name").value.trim();
+      const text = $("#material-note-text").value.trim();
+      if (!name || text.length < 10) throw new Error("Добавь название и текст конспекта (не меньше 10 символов).");
+      const filename = name.replace(/[\\/:*?"<>|]/g, "_").slice(0, 100) + ".txt";
+      const form = new FormData();
+      form.append("file", new File([text], filename, {type:"text/plain;charset=utf-8"}));
+      await api("/materials", {method:"POST", body:form});
+      $("#material-note-dialog").close();
+      await refresh();
+      toast("Конспект сохранён. Теперь доступны поиск цитат и тренировка.");
+    }, $("#material-note-error"));
+  };
   $$("[data-practice]").forEach(
     (b) => (b.onclick = () => selectPractice(b.dataset.practice)),
   );
@@ -778,4 +798,12 @@ function initFeatures() {
       $("#quest-bank"),
     );
   };
+}
+
+function openNoteDialog() {
+  $("#material-note-form").reset();
+  $("#material-note-error").replaceChildren();
+  $("#material-note-error").hidden = false;
+  $("#material-note-dialog").showModal();
+  $("#material-note-name").focus();
 }

@@ -4,6 +4,7 @@ from decimal import Decimal, ROUND_CEILING, ROUND_HALF_UP
 import hashlib
 import json
 import re
+import unicodedata
 from zoneinfo import ZoneInfo
 
 from campuspulse.dates import date_parts, aware_wall
@@ -178,18 +179,39 @@ def grade_target(config):
             "Decimal; нужный балл округляется вверх до 0,01. Формула применима к взвешенной сумме без дополнительных порогов/штрафов. Веса должен подтвердить пользователь.")}
 
 
+QUEST_LINE = re.compile(r"\s*([^:—=\n]{2,70})\s*[:—=]\s*(.{3,240})\s*")
+
+
+def normalize_fact_text(text):
+    """Ignore cosmetic copies, without removing internal punctuation or numbers."""
+    text = unicodedata.normalize("NFKC", text).casefold().replace("ё", "е")
+    return " ".join(text.split()).rstrip(" .!?;…")
+
+
+def quest_fact_identity(answer, description):
+    return hashlib.sha256((normalize_fact_text(answer) + "\n" + normalize_fact_text(description)).encode()).hexdigest()
+
+
+def quest_fact_from_source(source, expected=None):
+    """Recover a canonical identity from a saved quote, including legacy rewards."""
+    match = QUEST_LINE.fullmatch(source.get("quote", "")) if isinstance(source, dict) else None
+    if not match or (expected is not None and normalize_fact_text(match[1]) != normalize_fact_text(expected)):
+        return None
+    return quest_fact_identity(match[1], match[2])
+
+
 def quest_candidates(material):
     items = []
     for source in source_lines([material]):
         if re.search(r"сдать|дедлайн|deadline|\b\d+\s*%", source["quote"], re.I):
             continue
-        match = re.fullmatch(r"\s*([^:—=\n]{2,70})\s*[:—=]\s*(.{3,240})\s*", source["quote"])
+        match = QUEST_LINE.fullmatch(source["quote"])
         if not match:
             continue
         answer, description = match[1].strip(), match[2].strip()
         if not re.search(r"[А-Яа-яA-Za-z]", answer):
             continue
-        identity = hashlib.sha256((answer.casefold() + "\n" + description.casefold()).encode()).hexdigest()
+        identity = quest_fact_identity(answer, description)
         if any(q["id"] == identity for q in items):
             continue
         items.append({"id": identity, "question": "Восстановите термин из материала: «_____ — " + description + "»", "answer": answer, "source": source,

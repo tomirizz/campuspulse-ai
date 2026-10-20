@@ -64,7 +64,7 @@ def test_text_material_read_delete_isolation(client):
     assert client.delete("/api/materials/" + key).status_code == 204
 
 
-@pytest.mark.parametrize("name,raw,status", [("evil.exe", b"abc", 400), ("bad.pdf", b"not a PDF", 400), ("empty.txt", b"", 400), ("large.txt", b"x" * (5 * 1024 * 1024 + 1), 413)])
+@pytest.mark.parametrize("name,raw,status", [("evil.exe", b"abc", 400), ("bad.pdf", b"not a PDF", 400), ("empty.txt", b"", 400), ("large.txt", b"x" * (5 * 1024 * 1024 + 1), 413)], ids=["extension", "invalid-pdf", "empty", "oversized"])
 def test_invalid_materials(client, name, raw, status):
     assert client.post("/api/materials", files={"file": (name, raw)}).status_code == status
 

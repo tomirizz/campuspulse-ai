@@ -10,6 +10,11 @@ from mcp.client.stdio import stdio_client
 from campuspulse.planner import plan_week
 from campuspulse.progress import progress
 from campuspulse.study import search_materials, syllabus_candidates, scenario, grade_target, quest_candidates, diagnose
+from campuspulse.academic import AcademicSettings, analyze_course, academic_summary
+from campuspulse.academic_import import parse_syllabus
+from campuspulse.academic_planner import build_study_plan
+from campuspulse.progress import proof
+from campuspulse.academic_schedule import apply_exam_schedule
 
 
 def schema(name, description, properties=None, required=None):
@@ -19,6 +24,9 @@ def schema(name, description, properties=None, required=None):
 
 
 CUSTOM_TOOLS = [
+    schema("academic_overview", "Read the student's saved courses and calculate current weighted grades, reachable targets, GPA and risk priorities. Only actual confirmed syllabus weights and entered scores are used. No arguments."),
+    schema("academic_plan", "Allocate the student's available study time across saved courses using grade risk, difficulty, credits and deadlines. Uses confirmed courses, saved availability and busy calendar intervals. No arguments."),
+    schema("syllabus_weights", "Extract assessment weights and credits from a real uploaded syllabus, including nested attestation formulas. Returns a proposal and warnings, never saves it automatically.", {"material_id": {"type": "string"}}, ["material_id"]),
     schema("study_progress", "Get deterministic XP, level, streak and evidence for each calculation. Never calculate these yourself."),
     schema("list_tasks", "Read the student's actual tasks, deadlines, estimates and completion status."),
     schema("plan_week", "Build a feasible seven-day study plan from actual tasks and availability. Returns deadline risks."),
@@ -84,6 +92,35 @@ class ToolHub:
                 return json.loads(next(c.text for c in result.content if c.type == "text"))
             if name == "list_tasks":
                 return {"tasks": self.context.get("tasks", []), "source": "student_workspace"}
+            if name in {"academic_overview", "academic_plan"}:
+                settings = AcademicSettings.model_validate(self.context.get("academic_settings") or {}).model_dump(mode="json")
+                projections, schedule_notes = apply_exam_schedule(self.context.get("courses", []), self.context.get("academic_schedule", {}))
+                for projected in projections:
+                    projected.pop("_schedule_links", None)
+                courses = [analyze_course(c, tasks=self.context.get("tasks", []),
+                            grade_scale=settings["grade_scale"], min_target=settings["min_target"])
+                           for c in projections]
+                courses.sort(key=lambda c: -c["priority_score"])
+                if name == "academic_overview":
+                    return {"courses": courses, "summary": academic_summary(courses), "schedule_notes": schedule_notes,
+                            "why": proof("Расчёт предметов", "итог = Σ(балл / максимум × вес)",
+                                         {"предметов": len(courses)}, "Оценки и достижимые цели", "Сохранённые предметы и подтверждённые веса силлабуса")}
+                preferences = {**self.context.get("preferences", {}),
+                               **{k: settings[k] for k in ("timezone", "daily_minutes", "start_hour", "end_hour")}}
+                preferences["busy"] = self.context.get("preferences", {}).get("busy", [])
+                settings["imported_busy"] = self.context.get("academic_schedule", {}).get("busy", [])
+                result = build_study_plan(courses, self.context.get("tasks", []), preferences, settings)
+                result["why"] = proof("Распределение времени", result["policy"],
+                                      {"часов в день": settings["daily_minutes"] / 60, "предметов": len(courses)},
+                                      result["scheduled_minutes"], "Подтверждённые предметы, задания и занятые интервалы",
+                                      "Время подготовки — оценка, а не гарантия оценки. Окно и лимит можно изменить.")
+                self.last_plan = result
+                return result
+            if name == "syllabus_weights":
+                material = next((m for m in self.context.get("materials", []) if m["id"] == arguments["material_id"]), None)
+                if not material:
+                    return {"error": "Материал не найден. Используйте ID из list_materials"}
+                return parse_syllabus(material["pages"], name=material["name"])
             if name == "study_progress":
                 return progress(self.context.get("tasks", []), self.context.get("preferences", {}), quest_rewards=self.context.get("quest_rewards", []))
             if name == "plan_week":

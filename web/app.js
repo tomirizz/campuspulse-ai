@@ -10,13 +10,15 @@ const state = {
   history: [],
   health: {},
   filter: "open",
-  view: "overview",
+  view: "academic",
   trace: [],
   busy: [],
   sending: false,
 };
 const names = {
   overview: "Мой пульс",
+  academic: "Моя учёба",
+  notebook: "Конспекты",
   journey: "Мой путь",
   chat: "AI-ассистент",
   tasks: "Миссии",
@@ -155,9 +157,83 @@ function empty(title, text, action) {
   if (action) box.append(action);
   return box;
 }
-function showView(view) {
-  if (!names[view]) view = "overview";
+// Only entries created in this tab belong to the in-app Back button.
+// This preserves normal browser Back/Forward without leaving CampusPulse.
+const navigation = { initialized: false, index: 0, lastURL: "", session: "", pending: false, revision: 0 };
+try {
+  navigation.session = sessionStorage.getItem("campuspulse-navigation") || crypto.randomUUID();
+  sessionStorage.setItem("campuspulse-navigation", navigation.session);
+} catch (_) { navigation.session = String(Date.now()) + Math.random(); }
+function ownNavigation(entry = history.state) {
+  const value = entry?.campusNavigation;
+  return value?.session === navigation.session && names[value.view] ? value : null;
+}
+function routeContext(view = state.view) {
+  return view === "notebook" ? window.CampusNotebook?.navigationState() || null : null;
+}
+function navigationEntry(view, context, index = navigation.index, scroll = 0) {
+  return { campusNavigation: { session: navigation.session, index, view, context, scroll } };
+}
+function navigationIdentity(context) {
+  if (!context) return null;
+  if (context.mode === "read") return { mode:"read", note_id:context.note_id };
+  if (context.mode === "compose") return {
+    mode:"compose", selected:[...(context.selected || [])].sort(), preparing:context.preparing || null,
+    title:context.title || "", focus:context.focus || "", style:context.style || "summary",
+  };
+  return context;
+}
+function updateBackButton() {
+  const back = $("#header-back");
+  back.disabled = !navigation.initialized || (navigation.index <= 0 && state.view === "academic");
+  back.title = back.disabled ? "Это первый экран" : navigation.index <= 0 ? "К моей учёбе" : "Вернуться к предыдущему экрану";
+}
+function checkpointNavigation() {
+  const current = ownNavigation();
+  if (!navigation.initialized || navigation.pending || !current || current.view !== state.view) return;
+  history.replaceState(navigationEntry(state.view, routeContext(), current.index, window.scrollY), "");
+}
+function showView(view, options = {}) {
+  if (!names[view]) view = "academic";
+  const previousView = state.view;
+  const existing = ownNavigation();
+  let context = options.context !== undefined ? options.context : view === "notebook" ? routeContext(view) : null;
+  let restoring = options.history === "restore";
+  let restoreScroll = 0;
+  if (!navigation.initialized) {
+    navigation.initialized = true;
+    if (existing) {
+      navigation.index = existing.index;
+      if (options.context === undefined && existing.view === view) context = existing.context;
+      restoreScroll = existing.scroll || 0;
+      restoring = true;
+    }
+    history.replaceState(navigationEntry(view, context, navigation.index, restoreScroll), "", `#${view}`);
+  } else if (restoring) {
+    navigation.index = existing?.index || 0;
+    context = options.context !== undefined ? options.context : existing?.context || null;
+    restoreScroll = existing?.scroll || 0;
+    if (!existing) history.replaceState(navigationEntry(view, context), "", `#${view}`);
+  } else if (options.history === "adopt") {
+    navigation.index += 1;
+    history.replaceState(navigationEntry(view, context), "", `#${view}`);
+  } else {
+    const currentContext = routeContext();
+    checkpointNavigation();
+    const changed = previousView !== view || JSON.stringify(navigationIdentity(context)) !== JSON.stringify(navigationIdentity(currentContext));
+    if (options.history === "replace") history.replaceState(navigationEntry(view, context), "", `#${view}`);
+    else if (changed) {
+      navigation.index += 1;
+      history.pushState(navigationEntry(view, context), "", `#${view}`);
+    }
+  }
+  navigation.lastURL = location.href;
+  const revision = ++navigation.revision;
+  navigation.pending = true;
   state.view = view;
+  if (previousView !== view || restoring) $$("dialog[open]").forEach((dialog) => dialog.close());
+  const moreMenu = $(".nav-more");
+  if (moreMenu) moreMenu.open = false;
   $$(".view").forEach((v) => (v.hidden = v.id !== `view-${view}`));
   $$(".nav-item").forEach((b) => {
     b.classList.toggle("active", b.dataset.view === view);
@@ -165,11 +241,46 @@ function showView(view) {
     else b.removeAttribute("aria-current");
   });
   $("#page-name").textContent = names[view];
-  if (location.hash !== `#${view}`) history.replaceState(null, "", `#${view}`);
-  if (view === "week") loadPlan();
-  if (view === "chat") $("#chat-input").focus();
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  document.title = names[view] + " · CampusPulse";
+  updateBackButton();
+  const section = $(`#view-${view}`);
+  if (previousView !== view && !options.initial) {
+    section.classList.remove("is-entering");
+    void section.offsetWidth;
+    section.classList.add("is-entering");
+  }
+  let ready;
+  if (view === "week") {
+    loadPlan();
+    ready = window.CampusCalendar?.load();
+  }
+  if (view === "academic") ready = window.CampusAcademic?.load();
+  if (view === "settings") ready = window.CampusAcademic?.loadDemoStatus();
+  if (view === "notebook") ready = context && window.CampusNotebook?.restoreNavigation
+    ? window.CampusNotebook.restoreNavigation(context)
+    : window.CampusNotebook?.load();
+  if (!options.initial) {
+    const focus = view === "chat" ? $("#chat-input") : $("h1", section);
+    if (focus) { if (view !== "chat") focus.tabIndex = -1; focus.focus({ preventScroll: true }); }
+  }
+  window.scrollTo({ top: restoring ? restoreScroll : 0, behavior: "instant" });
+  return Promise.resolve(ready).then(() => {
+    if (state.view !== view || navigation.revision !== revision) return;
+    navigation.pending = false;
+    if (restoring) window.scrollTo({ top: restoreScroll, behavior: "instant" });
+    checkpointNavigation();
+  }).catch((error) => {
+    if (navigation.revision === revision) navigation.pending = false;
+    toast(error.message || "Не удалось открыть экран. Попробуй ещё раз.", true);
+  });
 }
+function navigateBack() {
+  if (navigation.index > 0 && ownNavigation()) history.back();
+  else if (navigation.initialized && navigation.index <= 0 && state.view !== "academic")
+    showView("academic", { history: "replace" });
+}
+$("#header-back").addEventListener("click", navigateBack);
+window.CampusNavigation = { checkpoint: checkpointNavigation, back: navigateBack };
 $$("[data-view]").forEach((b) =>
   b.addEventListener("click", () => showView(b.dataset.view)),
 );
@@ -188,7 +299,43 @@ $$("[data-prompt]").forEach((b) =>
     $("#chat-input").focus();
   }),
 );
-window.addEventListener("hashchange", () => showView(location.hash.slice(1)));
+window.addEventListener("popstate", () => {
+  const route = location.hash.slice(1);
+  if (names[route]) showView(route, { history: "restore" });
+});
+window.addEventListener("hashchange", () => {
+  const route = location.hash.slice(1);
+  if (!names[route] || navigation.lastURL === location.href) return;
+  showView(route, { history: ownNavigation() ? "restore" : "adopt" });
+});
+document.querySelector(".brand").addEventListener("click", (event) => {
+  event.preventDefault();
+  showView("academic");
+});
+document.querySelector(".skip-link").addEventListener("click", (event) => {
+  event.preventDefault();
+  $("#main").tabIndex = -1;
+  $("#main").focus();
+});
+// Native dialog Escape remains intact; return focus to the control that opened it.
+const dialogOrigins = new WeakMap();
+document.addEventListener("beforetoggle", (event) => {
+  if (event.target instanceof HTMLDialogElement && event.newState === "open")
+    dialogOrigins.set(event.target, document.activeElement);
+}, true);
+document.addEventListener("close", (event) => {
+  if (!(event.target instanceof HTMLDialogElement)) return;
+  queueMicrotask(() => {
+    if ($("dialog[open]")) return;
+    const origin = dialogOrigins.get(event.target);
+    if (origin?.isConnected && !origin.disabled && !origin.closest("[hidden]")) origin.focus({ preventScroll: true });
+  });
+}, true);
+let navigationScrollTimer;
+window.addEventListener("scroll", () => {
+  clearTimeout(navigationScrollTimer);
+  navigationScrollTimer = setTimeout(checkpointNavigation, 180);
+}, { passive: true });
 function confirmAction(title, text) {
   return new Promise((resolve) => {
     const d = $("#confirm-dialog");
@@ -203,6 +350,7 @@ function confirmAction(title, text) {
       resolve(false);
     };
     d.oncancel = () => resolve(false);
+    d.addEventListener("close", () => resolve(false), { once: true });
     d.showModal();
   });
 }
@@ -216,6 +364,7 @@ async function refresh() {
   renderPreferences();
   renderHealth();
   renderProgress();
+  window.CampusAcademic?.renderProgress();
   renderFeatures();
 }
 function deadline(task) {
@@ -425,7 +574,9 @@ function openTask(task = null) {
 $("#task-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const b = $("button[type=submit]", event.target);
+  if (b.disabled) return;
   b.disabled = true;
+  event.target.setAttribute("aria-busy", "true");
   try {
     const id = $("#task-id").value;
     await api("/tasks" + (id ? "/" + id : ""), {
@@ -448,6 +599,7 @@ $("#task-form").addEventListener("submit", async (event) => {
     toast(e.message, true);
   } finally {
     b.disabled = false;
+    event.target.setAttribute("aria-busy", "false");
   }
 });
 function renderPreferences() {
@@ -595,6 +747,9 @@ $("#material-upload").addEventListener("change", async (event) => {
 function renderMaterials() {
   const list = $("#material-list");
   list.replaceChildren();
+  if (!state.materials.length) {
+    list.append(empty("Здесь будет твоя база знаний", "Загрузи PDF с текстом или вставь конспект. Поиск покажет точную страницу и строку, а тренировка поможет повторить термины.", button("Вставить первый конспект", openNoteDialog)));
+  }
   state.materials.forEach((m) => {
     const card = el("article", "material-card");
     const mark = el("div", "file-icon");
@@ -632,6 +787,10 @@ function renderMaterials() {
         }
       }),
       button("Разобрать силлабус", () => showSyllabus(m)),
+      button("Добавить предмет", () => {
+        showView("academic");
+        window.CampusAcademic?.importMaterial(m.id);
+      }),
       button("Квест по материалу", () => {
         showView("practice");
         selectPractice("quests");
@@ -663,22 +822,38 @@ function renderHealth() {
     h.mode === "tools"
       ? "Google Gemini ожидает подключения"
       : h.mode === "remote"
-        ? "Google Gemini · Agent Engine"
-        : "Google Gemini · Vertex AI";
+        ? "Agent Engine"
+        : h.gemini_provider === "developer_api"
+          ? "Gemini · Google AI Studio"
+          : "Gemini · Vertex AI";
   $("strong", $("#mode-banner")).textContent = title;
   $(":scope > div > span", $("#mode-banner")).textContent =
     h.mode === "tools"
       ? "Формулы, поиск, квесты и календарный диалог доступны без ИИ."
       : "Ответы с источниками. Успешный вызов подтверждается журналом.";
-  $("#chat-mode").textContent = title + ". API-ключ пользователю не нужен.";
+  $("#chat-mode").textContent = title + ". Доступ настроен на сервере; подключение проверяется при запросе.";
+  if (h.mode === "tools") $("#chat-mode").textContent = "Учебные инструменты доступны · Gemini ещё не подключён. Поиск, формулы, цели и план работают сейчас.";
+  $$("[data-processing]").forEach((item) => {
+    item.textContent = h.mode === "tools"
+      ? "Локальная обработка · без отправки в Gemini."
+      : item.dataset.processing === "documents"
+        ? "При включённом Gemini выбранный документ может отправляться Google для распознавания. Не загружай личные секреты."
+        : "При включённом Gemini выбранные фрагменты отправляются Google для подготовки конспекта. Не загружай личные секреты.";
+  });
   const cards = $("#integration-cards");
   cards.replaceChildren();
   [
     [
       "Google Gemini",
-      "Единственная ИИ-модель проекта. Сервер входит в Google через авторизацию, без ключа пользователя.",
+      h.mode === "remote"
+        ? "Облачный агент Google Cloud. Сервер обращается к развёрнутому Agent Engine."
+        : h.gemini_provider === "developer_api"
+          ? "Gemini через Google AI Studio. Серверный ключ не показывается в браузере."
+          : h.mode === "tools"
+            ? "Формулы, план и работа с материалами доступны локально. Gemini можно подключить отдельно."
+            : "Gemini через Vertex AI. Сервер использует авторизацию Google Cloud.",
       h.mode === "tools"
-        ? "Ожидает настройки Google Cloud"
+        ? "Gemini не подключён"
         : "Настроен; доступ проверяется при запросе",
     ],
     [
@@ -686,7 +861,7 @@ function renderHealth() {
       "События основного календаря, уточнение даты и времени, проверка пересечений.",
       state.google?.connected
         ? "Разрешение сохранено"
-        : "Нужно подключить Google",
+        : state.google?.configured ? "Можно подключить Google" : "Доступен экспорт .ics · вход Google ещё не настроен",
     ],
     [
       "MCP и собственные функции",
@@ -813,11 +988,11 @@ function renderHistory() {
     ),
   );
   [
+    "Какие предметы сейчас требуют внимания?",
     "Составь план моей учебной недели",
-    "Покажи мои ближайшие дедлайны",
-    "Запланируй хакатон",
-    "Что если 2 часа в день?",
-    "Разбери мой силлабус",
+    "Сколько нужно набрать для цели 90?",
+    "Найди определение в моих материалах",
+    "Запланируй подготовку к экзамену завтра в 18:00",
   ].forEach((p) =>
     welcome.append(
       button(p, () => {
@@ -939,37 +1114,9 @@ $("#export-trace").onclick = () => {
   URL.revokeObjectURL(url);
 };
 $("#add-demo").onclick = async () => {
-  if (state.tasks.some((t) => t.notes.startsWith("Учебный пример"))) {
-    toast("Учебный пример уже добавлен");
-    return;
-  }
-  try {
-    for (const [i, title, course, minutes] of [
-      [1, "[Пример] Лабораторная по ML", "Machine Learning", 120],
-      [3, "[Пример] Подготовка к семинару", "Data Science", 90],
-      [5, "[Пример] Прототип для хакатона", "Build with AI", 180],
-    ]) {
-      const due = new Date();
-      due.setDate(due.getDate() + i);
-      await api("/tasks", {
-        method: "POST",
-        body: JSON.stringify({
-          title,
-          course,
-          estimated_minutes: minutes,
-          due_at: due.toISOString(),
-          notes:
-            "Учебный пример — синтетическое задание для проверки интерфейса.",
-        }),
-      });
-    }
-    await refresh();
-    showView("overview");
-    toast("Добавлены 3 учебных примера");
-  } catch (e) {
-    toast(e.message, true);
-  }
+  if (await window.CampusAcademic?.changeDemo()) showView("academic");
 };
+$("#remove-demo").onclick = () => window.CampusAcademic?.changeDemo(true);
 $("#clear-data").onclick = async () => {
   if (
     !(await confirmAction(
@@ -995,7 +1142,7 @@ async function start() {
     state.health = await api("/health");
     await refresh();
     renderHistory();
-    showView(location.hash.slice(1) || "overview");
+    showView(location.hash.slice(1) || "academic", { initial: true, history: "restore" });
   } catch (e) {
     toast("Не удалось загрузить приложение: " + e.message, true);
     $("#mode-banner").textContent =

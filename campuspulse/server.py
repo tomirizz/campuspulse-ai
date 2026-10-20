@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from pypdf import PdfReader
 
 from campuspulse.agent import gemini_run, tools_only_run
+from campuspulse.provider_errors import classify_provider_error
 from campuspulse.models import ChatInput, Preferences, TaskInput, TaskPatch
 from campuspulse.planner import calendar_export, plan_week
 from campuspulse.storage import make_store
@@ -22,6 +23,11 @@ from campuspulse.tools import ToolHub
 from campuspulse.calendar_dialogue import calendar_dialogue
 from campuspulse.google_calendar import connection_status
 from campuspulse.features_api import register_features, sync_calendar, with_calendar
+from campuspulse.academic_api import register_academic, academic_context, academic_plan
+from campuspulse.academic_drafts import register_academic_drafts
+from campuspulse.notebook_api import register_notebooks
+from campuspulse.calendar_api import register_calendar, with_local_events
+from campuspulse.demo_data import register_demo
 from campuspulse.study import validate_source, scenario_from_message
 from campuspulse.progress import progress, metrics, task_proof, complete_task, proof
 from fastapi.exceptions import RequestValidationError
@@ -62,6 +68,10 @@ async def session_boundary(request: Request, call_next):
 
 def workspace(sid):
     return {"tasks": store.list(sid, "tasks"), "materials": store.list(sid, "materials"),
+            "courses": store.list(sid, "courses"),
+            "academic_settings": store.get(sid, "meta", "academic_settings") or {},
+            "academic_schedule": store.get(sid, "meta", "academic_schedule") or {"busy": [], "exams": []},
+            "local_events": store.list(sid, "local_events"),
             "preferences": {**Preferences().model_dump(mode="json"), **(store.get(sid, "meta", "preferences") or {})},
             "quest_rewards": store.list(sid, "quest_rewards"),
             **{key: store.get(sid, "meta", key) for key in ("grade_config", "diagnostic", "scenario_input", "calendar_cache", "calendar_draft", "google_notice")}}
@@ -72,6 +82,8 @@ def effective_mode():
     if mode in {"auto", "local"}:
         if os.getenv("ENGINE_RESOURCE_NAME"):
             return "remote"
+        if os.getenv("GEMINI_API_KEY"):
+            return "gemini"
         if os.getenv("GOOGLE_CLOUD_PROJECT"):
             try:
                 import google.auth
@@ -86,8 +98,12 @@ def effective_mode():
 @app.get("/api/health")
 async def health():
     mode = effective_mode()
-    return {"ok": True, "version": "0.3.0", "mode": mode,
-            "model": os.getenv("GEMINI_MODEL", "gemini-3.6-flash") if mode != "tools" else None,
+    provider = "vertex_ai" if mode == "remote" else (
+        "developer_api" if mode == "gemini" and os.getenv("GEMINI_API_KEY") else
+        "vertex_ai" if mode == "gemini" else None)
+    return {"ok": True, "version": "0.4.0", "mode": mode,
+            "model": os.getenv("GEMINI_MODEL", "gemini-3.8-flash") if mode != "tools" else None,
+            "gemini_provider": provider,
             "storage": os.getenv("STORAGE_BACKEND", "sqlite"),
             "cloud_configured": bool(os.getenv("ENGINE_RESOURCE_NAME")),
             "cloud_verified": False,
@@ -161,6 +177,10 @@ def preferences(body: Preferences, request: Request):
         raise HTTPException(422, "Конец интервала должен быть позже начала")
     value = body.model_dump(mode="json")
     store.put(request.state.sid, "meta", "preferences", value)
+    academic_prefs = store.get(request.state.sid, "meta", "academic_settings")
+    if academic_prefs:
+        academic_prefs.update({k: value[k] for k in ("timezone", "daily_minutes", "start_hour", "end_hour")})
+        store.put(request.state.sid, "meta", "academic_settings", academic_prefs)
     return value
 
 
@@ -172,8 +192,11 @@ async def plan(request: Request):
             data["calendar_cache"] = await sync_calendar(store, request.state.sid, data["preferences"])
         except ValueError as exc:
             raise HTTPException(503, str(exc)) from exc
-    data = with_calendar(data)
-    result = plan_week(data["tasks"], data["preferences"])
+    data = with_local_events(with_calendar(data))
+    if data["courses"]:
+        result = academic_plan(academic_context(store, request.state.sid, data["tasks"]), data["tasks"], data["preferences"])
+    else:
+        result = plan_week(data["tasks"], data["preferences"])
     result["calendar"] = data.get("calendar_cache")
     return result
 
@@ -239,6 +262,10 @@ def read_material(material_id: str, request: Request):
 def delete_material(material_id: str, request: Request):
     if not store.delete(request.state.sid, "materials", material_id):
         raise HTTPException(404, "Материал не найден")
+    for course in store.list(request.state.sid, "courses"):
+        if material_id in course.get("material_ids", []):
+            course["material_ids"] = [mid for mid in course["material_ids"] if mid != material_id]
+            store.put(request.state.sid, "courses", course["id"], course)
 
 
 def remote_run(message, context, history):
@@ -267,6 +294,7 @@ async def chat(body: ChatInput, request: Request):
     if sid in active_sessions or chat_slots.locked():
         raise HTTPException(429, "Предыдущий запрос ещё обрабатывается. Подождите немного")
     active_sessions.add(sid)
+    mode = None
     try:
         async with chat_slots, asyncio.timeout(175):
             context = workspace(sid)
@@ -280,7 +308,7 @@ async def chat(body: ChatInput, request: Request):
                 context["diagnostic_request"] = {"code": code[2], "language": code[1], "filename": "chat.py" if code[1] == "python" else "chat.json"}
             if result is None and connection_status(store, sid)["connected"]:
                 context["calendar_cache"] = await sync_calendar(store, sid, context["preferences"])
-            context = with_calendar(context)
+            context = with_local_events(with_calendar(context))
             if result is not None:
                 pass
             elif mode == "remote":
@@ -302,7 +330,9 @@ async def chat(body: ChatInput, request: Request):
         raise HTTPException(503, str(exc)) from exc
     except Exception as exc:
         # Never leak upstream exceptions, tokens, or uploaded text to server logs.
-        raise HTTPException(503, "Агент недоступен. Проверьте выбранную модель и подключение; ответ не был сгенерирован") from exc
+        provider = "vertex_ai" if mode == "remote" or not os.getenv("GEMINI_API_KEY") else "developer_api"
+        failure = classify_provider_error(exc, provider)
+        raise HTTPException(503, failure["action"]) from exc
     finally:
         active_sessions.discard(sid)
 
@@ -315,6 +345,11 @@ def clear_workspace(request: Request):
 
 
 register_features(app, lambda: store, workspace)
+register_academic(app, lambda: store, workspace, extract_material, sync_calendar)
+register_academic_drafts(app, lambda: store)
+register_notebooks(app, lambda: store, workspace)
+register_calendar(app, lambda: store, workspace)
+register_demo(app, lambda: store)
 app.mount("/assets", StaticFiles(directory=ROOT / "web"), name="assets")
 
 

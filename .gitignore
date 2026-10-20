@@ -13,3 +13,8 @@ evidence/live-*.json
 *.log
 credentials*.json
 *service-account*.json
+*client_secret*.json
+tmp/
+.presentation-build/
+.codex-finalizer/
+dist/
