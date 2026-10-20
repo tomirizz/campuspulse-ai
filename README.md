@@ -10,6 +10,8 @@
 
 ## Запуск
 
+Живой деплой: https://kentucky-individuals-adrian-volleyball.trycloudflare.com/
+
 На Mac откройте **«Запустить CampusPulse.command»**. Либо:
 
 ```bash
